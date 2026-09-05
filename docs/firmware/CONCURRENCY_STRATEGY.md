@@ -135,7 +135,7 @@ HAL modules expose only semantic operations (`motor_set_speed`, `ina219_read_cur
 | **pthreads** (Linux SBC) | `SCHED_FIFO` thread | `timerfd` + thread | `asyncio` or blocking thread + `pthread_mutex` | Detached low-priority thread |
 | **Python asyncio** (prototyping) | `asyncio` not suitable for T0 → emit warning, use `threading` with real-time hints | `asyncio.create_task` with `loop.call_later` | Native async I/O | `asyncio.create_task` low priority |
 
-The agent selects the runtime based on the MCU manifest. RP2040/STM32 → FreeRTOS; Raspberry Pi → pthreads; development host → Python asyncio with threading fallback for T0.
+The agent selects the runtime based on the board manifest. **v1 codegen targets Raspberry Pi 4 → pthreads + Linux I2C/GPIO.** RP2040/STM32 → FreeRTOS; other Linux SBCs → pthreads; development host → Python asyncio with threading fallback for T0.
 
 ## Anti-Patterns (Never Generated)
 
