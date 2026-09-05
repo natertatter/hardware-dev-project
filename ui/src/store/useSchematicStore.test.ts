@@ -17,6 +17,9 @@ describe("useSchematicStore", () => {
       validationIssues: [],
       validationMessage: null,
       schematicApproved: false,
+      firmwareStatus: "idle",
+      firmwareOutputDir: null,
+      firmwareMessage: null,
     });
   });
 
@@ -32,13 +35,15 @@ describe("useSchematicStore", () => {
   });
 
   it("clears schematic approval when the canvas changes", () => {
-    useSchematicStore.setState({ schematicApproved: true });
+    useSchematicStore.setState({ schematicApproved: true, firmwareStatus: "success" });
 
     useSchematicStore.getState().actions.addNodeFromCatalog({
       label: "MCU",
       manifest: COMPONENT_CATALOG[0],
     });
 
-    expect(useSchematicStore.getState().schematicApproved).toBe(false);
+    const state = useSchematicStore.getState();
+    expect(state.schematicApproved).toBe(false);
+    expect(state.firmwareStatus).toBe("idle");
   });
 });

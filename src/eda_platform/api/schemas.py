@@ -48,3 +48,23 @@ class AutoWireRequest(BaseModel):
 class AutoWireResponse(BaseModel):
     project_state: ProjectState
     wires_added: int
+
+
+class GenerateFirmwareRequest(BaseModel):
+    project_state: ProjectState
+    approved: bool = Field(
+        ...,
+        description="Must be true — schematic must be explicitly approved before codegen",
+    )
+    manifests: dict[str, ComponentManifest] | None = Field(
+        default=None,
+        description="Optional manifest overrides; server catalog used when omitted",
+    )
+
+
+class GenerateFirmwareResponse(BaseModel):
+    success: bool
+    project_id: str
+    output_dir: str
+    files_written: list[str]
+    message: str

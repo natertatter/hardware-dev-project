@@ -26,6 +26,9 @@ function SchematicCanvas() {
   const validationIssues = useSchematicStore((s) => s.validationIssues);
   const validationMessage = useSchematicStore((s) => s.validationMessage);
   const schematicApproved = useSchematicStore((s) => s.schematicApproved);
+  const firmwareStatus = useSchematicStore((s) => s.firmwareStatus);
+  const firmwareOutputDir = useSchematicStore((s) => s.firmwareOutputDir);
+  const firmwareMessage = useSchematicStore((s) => s.firmwareMessage);
   const actions = useSchematicStore((s) => s.actions);
 
   useEffect(() => {
@@ -78,6 +81,18 @@ function SchematicCanvas() {
           >
             {schematicApproved ? "Schematic Approved" : "Approve Schematic"}
           </button>
+          <button
+            type="button"
+            onClick={() => actions.generateFirmware()}
+            disabled={
+              !schematicApproved ||
+              validationStatus !== "pass" ||
+              firmwareStatus === "generating"
+            }
+            className="rounded-md bg-violet-600 px-3 py-1.5 text-sm font-medium hover:bg-violet-500 disabled:opacity-50"
+          >
+            {firmwareStatus === "generating" ? "Generating…" : "Generate Firmware"}
+          </button>
         </div>
       </header>
 
@@ -128,6 +143,9 @@ function SchematicCanvas() {
             issues={validationIssues}
             message={validationMessage}
             schematicApproved={schematicApproved}
+            firmwareStatus={firmwareStatus}
+            firmwareOutputDir={firmwareOutputDir}
+            firmwareMessage={firmwareMessage}
           />
         </aside>
       </div>

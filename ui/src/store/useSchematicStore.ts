@@ -10,12 +10,14 @@ import {
   type NodeChange,
 } from "@xyflow/react";
 
-import { autoWireProjectState, fetchManifests, validateProjectState } from "@/lib/api";
+import { autoWireProjectState, fetchManifests, generateFirmware, validateProjectState } from "@/lib/api";
 import type { CatalogEntry, HardwareNodeData } from "@/types/schemas";
 import { compileProjectState } from "@/utils/compileProjectState";
 import { decompileProjectState } from "@/utils/decompileProjectState";
 
 export type ValidationStatus = "idle" | "validating" | "pass" | "fail" | "error";
+
+export type FirmwareStatus = "idle" | "generating" | "success" | "error";
 
 export interface ValidationIssueView {
   rule: string;
@@ -33,6 +35,9 @@ interface SchematicState {
   validationIssues: ValidationIssueView[];
   validationMessage: string | null;
   schematicApproved: boolean;
+  firmwareStatus: FirmwareStatus;
+  firmwareOutputDir: string | null;
+  firmwareMessage: string | null;
   actions: {
     onNodesChange: (changes: NodeChange<Node<HardwareNodeData>>[]) => void;
     onEdgesChange: (changes: EdgeChange[]) => void;
@@ -43,6 +48,7 @@ interface SchematicState {
     autoWire: () => Promise<void>;
     approveSchematic: () => void;
     resetApproval: () => void;
+    generateFirmware: () => Promise<void>;
   };
 }
 
@@ -57,17 +63,26 @@ export const useSchematicStore = create<SchematicState>((set, get) => ({
   validationIssues: [],
   validationMessage: null,
   schematicApproved: false,
+  firmwareStatus: "idle",
+  firmwareOutputDir: null,
+  firmwareMessage: null,
   actions: {
     onNodesChange: (changes) => {
       set({
         nodes: applyNodeChanges(changes, get().nodes),
         schematicApproved: false,
+        firmwareStatus: "idle",
+        firmwareOutputDir: null,
+        firmwareMessage: null,
       });
     },
     onEdgesChange: (changes) => {
       set({
         edges: applyEdgeChanges(changes, get().edges),
         schematicApproved: false,
+        firmwareStatus: "idle",
+        firmwareOutputDir: null,
+        firmwareMessage: null,
       });
     },
     onConnect: (connection) => {
@@ -80,6 +95,9 @@ export const useSchematicStore = create<SchematicState>((set, get) => ({
           get().edges,
         ),
         schematicApproved: false,
+        firmwareStatus: "idle",
+        firmwareOutputDir: null,
+        firmwareMessage: null,
       });
     },
     addNodeFromCatalog: (entry) => {
@@ -96,6 +114,9 @@ export const useSchematicStore = create<SchematicState>((set, get) => ({
       set({
         nodes: [...get().nodes, newNode],
         schematicApproved: false,
+        firmwareStatus: "idle",
+        firmwareOutputDir: null,
+        firmwareMessage: null,
       });
     },
     loadCatalog: async () => {
@@ -172,7 +193,7 @@ export const useSchematicStore = create<SchematicState>((set, get) => ({
           manifests,
           currentNodes,
         );
-        set({ nodes, edges, schematicApproved: false, validationStatus: "idle" });
+        set({ nodes, edges, schematicApproved: false, validationStatus: "idle", firmwareStatus: "idle", firmwareOutputDir: null, firmwareMessage: null });
       } catch (err) {
         set({
           validationStatus: "error",
@@ -186,5 +207,25 @@ export const useSchematicStore = create<SchematicState>((set, get) => ({
       }
     },
     resetApproval: () => set({ schematicApproved: false }),
+    generateFirmware: async () => {
+      if (!get().schematicApproved || get().validationStatus !== "pass") {
+        return;
+      }
+      set({ firmwareStatus: "generating", firmwareMessage: null });
+      try {
+        const projectState = compileProjectState(get().nodes, get().edges);
+        const result = await generateFirmware(projectState, true);
+        set({
+          firmwareStatus: "success",
+          firmwareOutputDir: result.output_dir,
+          firmwareMessage: result.message,
+        });
+      } catch (err) {
+        set({
+          firmwareStatus: "error",
+          firmwareMessage: err instanceof Error ? err.message : "Firmware generation failed.",
+        });
+      }
+    },
   },
 }));

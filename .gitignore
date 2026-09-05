@@ -14,3 +14,7 @@ out/
 *.tsbuildinfo
 ui/node_modules/
 ui/.next/
+
+# Generated firmware build output (Phase 9)
+generated/firmware/*/
+!generated/firmware/.gitkeep

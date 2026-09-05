@@ -1,10 +1,17 @@
-import type { ValidationIssueView, ValidationStatus } from "@/store/useSchematicStore";
+import type {
+  FirmwareStatus,
+  ValidationIssueView,
+  ValidationStatus,
+} from "@/store/useSchematicStore";
 
 interface ValidationPanelProps {
   status: ValidationStatus;
   issues: ValidationIssueView[];
   message: string | null;
   schematicApproved: boolean;
+  firmwareStatus: FirmwareStatus;
+  firmwareOutputDir: string | null;
+  firmwareMessage: string | null;
 }
 
 const STATUS_LABELS: Record<ValidationStatus, string> = {
@@ -23,11 +30,21 @@ const STATUS_COLORS: Record<ValidationStatus, string> = {
   error: "text-orange-400",
 };
 
+const FIRMWARE_COLORS: Record<FirmwareStatus, string> = {
+  idle: "text-slate-400",
+  generating: "text-amber-400",
+  success: "text-emerald-400",
+  error: "text-red-400",
+};
+
 export function ValidationPanel({
   status,
   issues,
   message,
   schematicApproved,
+  firmwareStatus,
+  firmwareOutputDir,
+  firmwareMessage,
 }: ValidationPanelProps) {
   return (
     <div className="space-y-3">
@@ -40,7 +57,7 @@ export function ValidationPanel({
       {message && <p className="text-xs text-slate-400">{message}</p>}
       {schematicApproved && (
         <p className="rounded border border-blue-700 bg-blue-950/50 px-2 py-1 text-xs text-blue-300">
-          Schematic approved — ready for firmware generation (Phase 9).
+          Schematic approved — you can generate firmware for Raspberry Pi 4.
         </p>
       )}
       {issues.length > 0 && (
@@ -62,6 +79,22 @@ export function ValidationPanel({
             </li>
           ))}
         </ul>
+      )}
+
+      <h2 className="pt-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
+        Firmware (Pi 4)
+      </h2>
+      <p className={`text-sm font-medium ${FIRMWARE_COLORS[firmwareStatus]}`}>
+        {firmwareStatus === "idle" && "Not generated"}
+        {firmwareStatus === "generating" && "Generating…"}
+        {firmwareStatus === "success" && "Generated"}
+        {firmwareStatus === "error" && "Generation failed"}
+      </p>
+      {firmwareMessage && <p className="text-xs text-slate-400">{firmwareMessage}</p>}
+      {firmwareOutputDir && (
+        <p className="rounded border border-violet-800 bg-violet-950/40 px-2 py-1 font-mono text-xs text-violet-200">
+          {firmwareOutputDir}
+        </p>
       )}
     </div>
   );
