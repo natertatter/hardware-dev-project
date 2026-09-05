@@ -219,6 +219,40 @@ class TestLogicChecker:
         with pytest.raises(LogicCheckerError, match="I2C address collision"):
             validate_project(_i2c_collision_project_state(), MANIFESTS)
 
+    def test_unknown_component_id_raises(self):
+        """Defensive: a node referencing a component_id missing from the manifest
+        dict raises LogicCheckerError instead of a raw KeyError/AttributeError."""
+        project = ProjectState(
+            project_id="unknown_component",
+            nodes=[Node(node_id="mystery_1", component_id="does_not_exist")],
+            nets=[
+                Net(
+                    net_id="net_gnd",
+                    net_type=NetType.GND,
+                    connections=[NetConnection(node_id="mystery_1", pin_id="GND")],
+                ),
+            ],
+        )
+        with pytest.raises(LogicCheckerError, match="unknown component_id"):
+            validate_project(project, MANIFESTS)
+
+    def test_unknown_pin_id_raises(self):
+        """Defensive: a connection referencing a pin_id absent from the manifest
+        raises LogicCheckerError rather than silently passing validation."""
+        project = ProjectState(
+            project_id="unknown_pin",
+            nodes=[Node(node_id="mcu_1", component_id="mcu_rp2040")],
+            nets=[
+                Net(
+                    net_id="net_bogus",
+                    net_type=NetType.SIGNAL,
+                    connections=[NetConnection(node_id="mcu_1", pin_id="GPIO99")],
+                ),
+            ],
+        )
+        with pytest.raises(LogicCheckerError, match="has no pin"):
+            validate_project(project, MANIFESTS)
+
 
 def main() -> int:
     """Run integration tests headlessly (no pytest required)."""

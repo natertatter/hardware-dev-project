@@ -9,15 +9,6 @@ from eda_platform.schemas import (
     PowerRequirements,
 )
 
-# Known supply-rail voltages for POWER pins (pin_id -> volts).
-# Used by the Logic Checker when comparing power net compatibility.
-POWER_PIN_NOMINAL_VOLTAGES: dict[str, float] = {
-    "VBUS": 5.0,
-    "5V": 5.0,
-    "3V3_OUT": 3.3,
-    "3V3": 3.3,
-}
-
 
 def mcu_rp2040_manifest() -> ComponentManifest:
     """Raspberry Pi Pico (RP2040) — 3.3 V logic, 5 V VBUS input, I2C on GPIO4/5."""

@@ -2,8 +2,14 @@
 
 from __future__ import annotations
 
-from eda_platform.schemas import ComponentManifest, ComponentType, NetType, PinType, ProjectState
-from eda_platform.schemas.project_state import Net
+from eda_platform.schemas import (
+    ComponentManifest,
+    ComponentType,
+    Net,
+    NetType,
+    PinType,
+    ProjectState,
+)
 
 # Pin types that form shared peripheral buses (exempt from MCU pin-exclusivity).
 BUS_PIN_TYPES = frozenset(
@@ -18,6 +24,14 @@ BUS_PIN_TYPES = frozenset(
 )
 
 # POWER pin_ids with fixed rail voltages (volts). All other POWER pins use logic_level_voltage.
+#
+# LIMITATION: ComponentManifest.Pin has no per-pin voltage field, so a component with
+# multiple POWER pins at different rails (e.g. a 5V VBUS input alongside a 3.3V regulated
+# output) cannot be fully described by the schema alone. This lookup table is a pragmatic
+# stand-in keyed by common pin-naming conventions. Any POWER pin_id not listed here falls
+# back to the component's single `logic_level_voltage`, which is only correct when a
+# component exposes just one power rail. A more robust fix would add an optional
+# `nominal_voltage` field to `Pin` itself; tracked as a future schema enhancement.
 POWER_PIN_NOMINAL_VOLTAGES: dict[str, float] = {
     "VBUS": 5.0,
     "5V": 5.0,
@@ -154,7 +168,11 @@ def check_i2c_collisions(
         for conn in net.connections:
             manifest = _manifest_for_node(conn.node_id, project, manifests)
             pin = _find_pin(manifest, conn.pin_id)
-            if pin is None or pin.pin_type not in (PinType.I2C_SDA, PinType.I2C_SCL):
+            if pin is None:
+                raise LogicCheckerError(
+                    f"net '{net.net_id}': node '{conn.node_id}' has no pin '{conn.pin_id}'"
+                )
+            if pin.pin_type not in (PinType.I2C_SDA, PinType.I2C_SCL):
                 continue
 
             address = _node_i2c_address(conn.node_id, project, manifests)
@@ -176,7 +194,11 @@ def _net_is_i2c_bus(
     for conn in net.connections:
         manifest = _manifest_for_node(conn.node_id, project, manifests)
         pin = _find_pin(manifest, conn.pin_id)
-        if pin is not None and pin.pin_type in (PinType.I2C_SDA, PinType.I2C_SCL):
+        if pin is None:
+            raise LogicCheckerError(
+                f"net '{net.net_id}': node '{conn.node_id}' has no pin '{conn.pin_id}'"
+            )
+        if pin.pin_type in (PinType.I2C_SDA, PinType.I2C_SCL):
             return True
     return False
 
