@@ -37,7 +37,7 @@ def _draft_to_project_state(draft) -> ProjectState:
 
 @router.post("/architect/auto-wire", response_model=AutoWireResponse)
 def auto_wire_schematic(body: AutoWireRequest) -> AutoWireResponse:
-    manifests = load_all_manifests()
+    manifests = body.manifests if body.manifests is not None else load_all_manifests()
     if not manifests:
         raise HTTPException(status_code=500, detail="No manifests loaded on server")
 

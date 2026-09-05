@@ -43,6 +43,10 @@ class AutoWireRequest(BaseModel):
     """Template architect: wire MCU to peripherals already placed on the schematic."""
 
     project_state: SchematicDraft
+    manifests: dict[str, ComponentManifest] | None = Field(
+        default=None,
+        description="Optional manifest overrides; server catalog used when omitted",
+    )
 
 
 class AutoWireResponse(BaseModel):
