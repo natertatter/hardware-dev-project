@@ -196,6 +196,111 @@ def _i2c_collision_project_state() -> ProjectState:
     )
 
 
+def _bus_pin_spans_two_buses_project_state() -> ProjectState:
+    """MCU's SDA pin wired into two distinct I2C bus nets — should fail validation.
+
+    Even though both nets are net_type=BUS, the same physical GPIO4 pin cannot
+    belong to two separate bus nets without shorting them together.
+    """
+    return ProjectState(
+        project_id="bus_pin_spans_two_buses",
+        nodes=[
+            Node(node_id="mcu_1", component_id="mcu_rp2040"),
+            Node(
+                node_id="sensor_1",
+                component_id="sens_ina219",
+                assigned_i2c_address="0x40",
+            ),
+            Node(
+                node_id="sensor_2",
+                component_id="sens_ina219",
+                assigned_i2c_address="0x41",
+            ),
+        ],
+        nets=[
+            Net(
+                net_id="net_i2c_bus_0_sda",
+                net_type=NetType.BUS,
+                connections=[
+                    NetConnection(node_id="mcu_1", pin_id="GPIO4"),
+                    NetConnection(node_id="sensor_1", pin_id="I2C_SDA"),
+                ],
+            ),
+            Net(
+                net_id="net_i2c_bus_1_sda",
+                net_type=NetType.BUS,
+                connections=[
+                    NetConnection(node_id="mcu_1", pin_id="GPIO4"),
+                    NetConnection(node_id="sensor_2", pin_id="I2C_SDA"),
+                ],
+            ),
+            Net(
+                net_id="net_gnd",
+                net_type=NetType.GND,
+                connections=[
+                    NetConnection(node_id="mcu_1", pin_id="GND"),
+                    NetConnection(node_id="sensor_1", pin_id="GND"),
+                    NetConnection(node_id="sensor_2", pin_id="GND"),
+                ],
+            ),
+        ],
+    )
+
+
+def _shared_bus_net_multiple_devices_project_state() -> ProjectState:
+    """Three devices sharing ONE I2C bus net — must NOT be flagged as a collision.
+
+    This is the legitimate "except I2C/SPI buses" case: many connections, one
+    net_id, per bus line. Distinct from _bus_pin_spans_two_buses_project_state
+    where the same pin spans two *different* net_ids.
+    """
+    return ProjectState(
+        project_id="shared_bus_many_devices",
+        nodes=[
+            Node(node_id="mcu_1", component_id="mcu_rp2040"),
+            Node(
+                node_id="sensor_1",
+                component_id="sens_ina219",
+                assigned_i2c_address="0x40",
+            ),
+            Node(
+                node_id="sensor_2",
+                component_id="sens_ina219",
+                assigned_i2c_address="0x41",
+            ),
+        ],
+        nets=[
+            Net(
+                net_id="net_i2c_sda",
+                net_type=NetType.BUS,
+                connections=[
+                    NetConnection(node_id="mcu_1", pin_id="GPIO4"),
+                    NetConnection(node_id="sensor_1", pin_id="I2C_SDA"),
+                    NetConnection(node_id="sensor_2", pin_id="I2C_SDA"),
+                ],
+            ),
+            Net(
+                net_id="net_i2c_scl",
+                net_type=NetType.BUS,
+                connections=[
+                    NetConnection(node_id="mcu_1", pin_id="GPIO5"),
+                    NetConnection(node_id="sensor_1", pin_id="I2C_SCL"),
+                    NetConnection(node_id="sensor_2", pin_id="I2C_SCL"),
+                ],
+            ),
+            Net(
+                net_id="net_gnd",
+                net_type=NetType.GND,
+                connections=[
+                    NetConnection(node_id="mcu_1", pin_id="GND"),
+                    NetConnection(node_id="sensor_1", pin_id="GND"),
+                    NetConnection(node_id="sensor_2", pin_id="GND"),
+                ],
+            ),
+        ],
+    )
+
+
 MANIFESTS = mock_manifests()
 
 
@@ -218,6 +323,15 @@ class TestLogicChecker:
         """Test D: Duplicate I2C addresses on the same bus raise a collision error."""
         with pytest.raises(LogicCheckerError, match="I2C address collision"):
             validate_project(_i2c_collision_project_state(), MANIFESTS)
+
+    def test_bus_pin_spanning_two_bus_nets_fails(self):
+        """A pin cannot span two distinct bus nets, even though both are BUS type."""
+        with pytest.raises(LogicCheckerError, match="pin collision"):
+            validate_project(_bus_pin_spans_two_buses_project_state(), MANIFESTS)
+
+    def test_shared_bus_net_multiple_devices_passes(self):
+        """Multiple devices sharing one bus net (same net_id) is not a collision."""
+        validate_project(_shared_bus_net_multiple_devices_project_state(), MANIFESTS)
 
     def test_unknown_component_id_raises(self):
         """Defensive: a node referencing a component_id missing from the manifest
@@ -278,6 +392,17 @@ def main() -> int:
                 lambda: validate_project(_i2c_collision_project_state(), MANIFESTS),
                 "i2c address collision",
             ),
+        ),
+        (
+            "Test E (Fail - Bus Pin Spans Two Buses)",
+            lambda: _expect_logic_checker_error(
+                lambda: validate_project(_bus_pin_spans_two_buses_project_state(), MANIFESTS),
+                "pin collision",
+            ),
+        ),
+        (
+            "Test F (Pass - Shared Bus, Multiple Devices)",
+            lambda: validate_project(_shared_bus_net_multiple_devices_project_state(), MANIFESTS),
         ),
     ]
 

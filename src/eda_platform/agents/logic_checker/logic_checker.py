@@ -11,18 +11,6 @@ from eda_platform.schemas import (
     ProjectState,
 )
 
-# Pin types that form shared peripheral buses (exempt from MCU pin-exclusivity).
-BUS_PIN_TYPES = frozenset(
-    {
-        PinType.I2C_SDA,
-        PinType.I2C_SCL,
-        PinType.SPI_MOSI,
-        PinType.SPI_MISO,
-        PinType.SPI_SCK,
-        PinType.SPI_CS,
-    }
-)
-
 # POWER pin_ids with fixed rail voltages (volts). All other POWER pins use logic_level_voltage.
 #
 # LIMITATION: ComponentManifest.Pin has no per-pin voltage field, so a component with
@@ -125,8 +113,18 @@ def check_voltage_levels(
 def check_pin_exclusivity(
     project: ProjectState, manifests: dict[str, ComponentManifest]
 ) -> None:
-    """Ensure each MCU pin appears on at most one net (I2C/SPI bus nets exempt)."""
-    pin_nets: dict[tuple[str, str], list[str]] = {}
+    """Ensure each MCU pin is wired into exactly one distinct net.
+
+    A single net may legitimately contain many connections — e.g. an I2C/SPI bus
+    net where the MCU's bus pin and several peripheral pins all share one net_id.
+    That is not a collision: it is one net with multiple endpoints. What IS a
+    collision is the same physical MCU pin appearing in two *different* net_ids,
+    since a pin is a single electrical node and cannot belong to two nets without
+    shorting them together. This applies uniformly to every pin type — including
+    I2C/SPI bus pins — because a bus pin spanning two distinct bus nets (e.g. two
+    separate I2C buses) is just as invalid as a GPIO pin wired into two nets.
+    """
+    pin_nets: dict[tuple[str, str], dict[str, None]] = {}
 
     for net in project.nets:
         for conn in net.connections:
@@ -140,15 +138,13 @@ def check_pin_exclusivity(
                     f"net '{net.net_id}': MCU node '{conn.node_id}' has no pin '{conn.pin_id}'"
                 )
 
-            # I2C/SPI bus pins on BUS nets are shared across devices — not exclusive.
-            if pin.pin_type in BUS_PIN_TYPES and net.net_type == NetType.BUS:
-                continue
-
             key = (conn.node_id, conn.pin_id)
-            pin_nets.setdefault(key, []).append(net.net_id)
+            # dict used as an insertion-ordered set (net_id -> None) to dedup
+            # repeated appearances of this pin within the same net.
+            pin_nets.setdefault(key, {})[net.net_id] = None
 
     for (node_id, pin_id), net_ids in pin_nets.items():
-        unique_nets = list(dict.fromkeys(net_ids))
+        unique_nets = list(net_ids)
         if len(unique_nets) > 1:
             raise LogicCheckerError(
                 f"pin collision: MCU '{node_id}' pin '{pin_id}' assigned to multiple nets: "
