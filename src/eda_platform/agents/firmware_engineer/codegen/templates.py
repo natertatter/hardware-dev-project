@@ -1,10 +1,27 @@
 """C code templates for Raspberry Pi 4 pthreads firmware."""
 
 from eda_platform.agents.firmware_engineer.models import SchedulingPlan
-from eda_platform.agents.firmware_engineer.pin_map import I2C_DEVICE_PATH, I2C_BUS_NUMBER
+from eda_platform.agents.firmware_engineer.pin_map import (
+    I2C_BUS_NUMBER,
+    I2C_DEVICE_PATH,
+    bcm_for_logical_pin,
+)
+
+_FALLBACK_SDA_BCM = 2
+_FALLBACK_SCL_BCM = 3
 
 
-def board_config_h(plan: SchedulingPlan) -> str:
+def board_config_h(
+    plan: SchedulingPlan,
+    sda_pin_id: str | None = None,
+    scl_pin_id: str | None = None,
+) -> str:
+    # Resolve the schematic's actual wired I2C pins through the platform pin
+    # map; fall back to the Pi I2C1 default (BCM 2/3) only when the
+    # schematic's pin_id isn't in the map (e.g. an unmapped MCU family).
+    sda_bcm = (bcm_for_logical_pin(sda_pin_id) if sda_pin_id else None) or _FALLBACK_SDA_BCM
+    scl_bcm = (bcm_for_logical_pin(scl_pin_id) if scl_pin_id else None) or _FALLBACK_SCL_BCM
+
     return f"""/* Auto-generated board configuration for {plan.platform} */
 #ifndef BOARD_CONFIG_H
 #define BOARD_CONFIG_H
@@ -13,9 +30,9 @@ def board_config_h(plan: SchedulingPlan) -> str:
 #define I2C_BUS_NUMBER {I2C_BUS_NUMBER}
 #define SENSOR_POLL_PERIOD_MS 20
 
-/* Logical schematic GPIO4/5 (RP2040) mapped to Pi I2C1 pins */
-#define PIN_I2C_SDA_BCM 2
-#define PIN_I2C_SCL_BCM 3
+/* Schematic I2C pins ({sda_pin_id or "default"}/{scl_pin_id or "default"}) mapped to Pi header */
+#define PIN_I2C_SDA_BCM {sda_bcm}
+#define PIN_I2C_SCL_BCM {scl_bcm}
 
 #endif /* BOARD_CONFIG_H */
 """
@@ -61,10 +78,7 @@ int hal_i2c_bus_0_init(void) {{
         perror("hal_i2c_bus_0_init: open");
         return -1;
     }}
-    if (ioctl(i2c_fd, I2C_SLAVE, 0) < 0) {{
-        perror("hal_i2c_bus_0_init: ioctl");
-        return -1;
-    }}
+    /* Target address is set per-transaction in set_slave(); no fixed slave here. */
     return 0;
 }}
 

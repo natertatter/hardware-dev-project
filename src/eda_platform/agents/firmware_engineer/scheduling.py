@@ -8,41 +8,45 @@ from eda_platform.agents.firmware_engineer.models import (
     SchedulingPlan,
     TaskSpec,
 )
-from eda_platform.schemas import ComponentManifest, ProjectState
+from eda_platform.schemas import ComponentManifest, ComponentType, PinType, ProjectState
 
 I2C_DEVICE_PATH = "/dev/i2c-1"
 
+_I2C_PIN_TYPES = {PinType.I2C_SDA, PinType.I2C_SCL}
 
-def _i2c_nodes_on_bus(project: ProjectState) -> dict[str, list[str]]:
-    """Group node_ids that share an I2C SDA or SCL net."""
-    bus_members: dict[str, set[str]] = {}
+
+def _i2c_peripheral_nodes(
+    project: ProjectState, manifests: dict[str, ComponentManifest]
+) -> list[str]:
+    """Return peripheral node_ids wired to an I2C SDA/SCL pin on some net.
+
+    Detection is driven by ``Pin.pin_type`` from the manifest — never by
+    pin_id naming convention — so it generalizes to any MCU or sensor
+    regardless of how its datasheet-derived pins happen to be named.
+    """
+    node_by_id = {n.node_id: n for n in project.nodes}
+    i2c_node_ids: set[str] = set()
 
     for net in project.nets:
-        has_i2c = False
-        nodes_on_net: set[str] = set()
         for conn in net.connections:
-            nodes_on_net.add(conn.node_id)
-        for conn in net.connections:
-            # Detect I2C by pin naming convention on the net
-            if conn.pin_id in ("I2C_SDA", "I2C_SCL", "GPIO4", "GPIO5"):
-                has_i2c = True
-                break
-        if has_i2c:
-            bus_key = f"i2c_bus_{len(bus_members)}"
-            bus_members.setdefault(bus_key, set()).update(nodes_on_net)
+            node = node_by_id.get(conn.node_id)
+            if node is None:
+                continue
+            manifest = manifests.get(node.component_id)
+            if manifest is None:
+                continue
+            pin = next((p for p in manifest.pins if p.pin_id == conn.pin_id), None)
+            if pin is not None and pin.pin_type in _I2C_PIN_TYPES:
+                i2c_node_ids.add(conn.node_id)
 
-    if not bus_members:
-        return {"i2c_bus_0": []}
-
-    # Merge all I2C nets into bus 0 for v1 (single Pi I2C controller)
-    all_nodes: set[str] = set()
-    for members in bus_members.values():
-        all_nodes.update(members)
-
-    # Exclude MCU host nodes
-    mcu_ids = {n.node_id for n in project.nodes if n.component_id.startswith("mcu_")}
-    peripherals = sorted(nid for nid in all_nodes if nid not in mcu_ids)
-    return {"i2c_bus_0": peripherals}
+    # MCU is the bus host, not a schedulable bus member.
+    peripherals = [
+        nid
+        for nid in i2c_node_ids
+        if manifests.get(node_by_id[nid].component_id) is not None
+        and manifests[node_by_id[nid].component_id].type != ComponentType.MCU
+    ]
+    return sorted(peripherals)
 
 
 def build_scheduling_plan(
@@ -51,25 +55,25 @@ def build_scheduling_plan(
     classifications: list[NodeClassification],
 ) -> SchedulingPlan:
     """Allocate pthread tasks and bus mutexes per CONCURRENCY_STRATEGY.md."""
-    i2c_groups = _i2c_nodes_on_bus(project)
+    i2c_peripherals = _i2c_peripheral_nodes(project, manifests)
     bus_locks: list[BusLock] = []
     tasks: list[TaskSpec] = []
 
-    for bus_id, node_ids in i2c_groups.items():
-        if not node_ids:
-            continue
+    if i2c_peripherals:
         bus_locks.append(
-            BusLock(bus_id=bus_id, i2c_device_path=I2C_DEVICE_PATH, nodes=node_ids)
+            BusLock(bus_id="i2c_bus_0", i2c_device_path=I2C_DEVICE_PATH, nodes=i2c_peripherals)
         )
 
-        t1_nodes = [
+        # T0 nodes get their own dedicated control task below even if they
+        # also share this bus; everything else polls together on one task.
+        poll_nodes = [
             c.node_id
             for c in classifications
-            if c.node_id in node_ids and c.tier in (ExecutionTier.T1, ExecutionTier.T2)
+            if c.node_id in i2c_peripherals and c.tier != ExecutionTier.T0
         ]
-        if t1_nodes:
+        if poll_nodes:
             hal_modules = ["hal_i2c_bus_0"] + [
-                c.hal_module for c in classifications if c.node_id in t1_nodes
+                c.hal_module for c in classifications if c.node_id in poll_nodes
             ]
             tasks.append(
                 TaskSpec(
@@ -77,13 +81,18 @@ def build_scheduling_plan(
                     tier=ExecutionTier.T1,
                     priority=5,
                     period_ms=20,
-                    nodes=t1_nodes,
+                    nodes=poll_nodes,
                     hal_modules=hal_modules,
                 )
             )
 
     t0_nodes = [c for c in classifications if c.tier == ExecutionTier.T0]
     for c in t0_nodes:
+        # A T0 node that also shares the I2C bus (e.g. a motor driver with
+        # an I2C config interface) still needs the bus mutex in its task.
+        hal_modules = [c.hal_module]
+        if c.node_id in i2c_peripherals:
+            hal_modules.insert(0, "hal_i2c_bus_0")
         tasks.append(
             TaskSpec(
                 task_id=f"task_{c.node_id}_control",
@@ -91,7 +100,7 @@ def build_scheduling_plan(
                 priority=10,
                 period_ms=1,
                 nodes=[c.node_id],
-                hal_modules=[c.hal_module],
+                hal_modules=hal_modules,
             )
         )
 

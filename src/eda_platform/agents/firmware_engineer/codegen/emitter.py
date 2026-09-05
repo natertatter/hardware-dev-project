@@ -4,7 +4,7 @@ from pathlib import Path
 
 from eda_platform.agents.firmware_engineer.codegen import templates
 from eda_platform.agents.firmware_engineer.models import SchedulingPlan
-from eda_platform.schemas import ComponentManifest, ProjectState
+from eda_platform.schemas import ComponentManifest, ComponentType, PinType, ProjectState
 
 
 def _node_address(node_id: str, project: ProjectState, manifest: ComponentManifest) -> int:
@@ -21,7 +21,7 @@ def _sensor_nodes(
         manifest = manifests.get(c.component_id)
         if manifest is None:
             continue
-        if manifest.type.value != "SENSOR":
+        if manifest.type != ComponentType.SENSOR:
             continue
         sensors.append(
             {
@@ -34,6 +34,35 @@ def _sensor_nodes(
     return sensors
 
 
+def _mcu_i2c_pins(
+    project: ProjectState, manifests: dict[str, ComponentManifest]
+) -> tuple[str | None, str | None]:
+    """Find the MCU's logical SDA/SCL pin_ids actually wired in this schematic."""
+    sda_pin_id: str | None = None
+    scl_pin_id: str | None = None
+
+    for node in project.nodes:
+        manifest = manifests.get(node.component_id)
+        if manifest is None or manifest.type != ComponentType.MCU:
+            continue
+
+        wired_pin_ids = {
+            conn.pin_id
+            for net in project.nets
+            for conn in net.connections
+            if conn.node_id == node.node_id
+        }
+        for pin in manifest.pins:
+            if pin.pin_id not in wired_pin_ids:
+                continue
+            if pin.pin_type == PinType.I2C_SDA:
+                sda_pin_id = pin.pin_id
+            elif pin.pin_type == PinType.I2C_SCL:
+                scl_pin_id = pin.pin_id
+
+    return sda_pin_id, scl_pin_id
+
+
 def generate_source_files(
     project: ProjectState,
     manifests: dict[str, ComponentManifest],
@@ -41,9 +70,10 @@ def generate_source_files(
 ) -> dict[str, str]:
     """Return relative path → file contents for the full firmware tree."""
     sensors = _sensor_nodes(plan, project, manifests)
+    sda_pin_id, scl_pin_id = _mcu_i2c_pins(project, manifests)
     files: dict[str, str] = {}
 
-    files["platform/board_config.h"] = templates.board_config_h(plan)
+    files["platform/board_config.h"] = templates.board_config_h(plan, sda_pin_id, scl_pin_id)
     files["hal/hal_i2c_bus_0.h"] = templates.hal_i2c_bus_0_h()
     files["hal/hal_i2c_bus_0.c"] = templates.hal_i2c_bus_0_c()
 
