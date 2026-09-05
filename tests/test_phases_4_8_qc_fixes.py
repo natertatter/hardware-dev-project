@@ -1,5 +1,6 @@
 """Regression tests for the Phases 4–8 QC fix list."""
 
+import time
 from pathlib import Path
 
 import pytest
@@ -9,6 +10,8 @@ from eda_platform.agents.architect.template_layout import template_i2c_layout
 from eda_platform.agents.logic_checker import validate_project_collect
 from eda_platform.agents.logic_checker.logic_checker import LogicCheckerError, validate_project
 from eda_platform.api.main import app
+from eda_platform.api.schemas import SchematicDraft
+from eda_platform.api.routes.architect import _draft_to_project_state
 from eda_platform.api.manifest_loader import clear_manifest_cache, load_all_manifests
 from eda_platform.schemas import (
     ComponentManifest,
@@ -50,6 +53,31 @@ class TestManifestLoaderResilience:
         res = client.get("/api/v1/manifests")
         assert res.status_code == 200
         assert len(res.json()["manifests"]) == 1
+
+        clear_manifest_cache()
+
+    def test_catalog_cache_refreshes_when_manifest_files_change(self, tmp_path, monkeypatch):
+        from eda_platform.api import manifest_loader
+
+        manifests_dir = tmp_path / "manifests"
+        manifests_dir.mkdir()
+        (manifests_dir / "first.json").write_text(
+            mock_manifests()["mcu_rp2040"].model_dump_json()
+        )
+
+        monkeypatch.setattr(manifest_loader, "_MANIFESTS_DIR", manifests_dir)
+        clear_manifest_cache()
+
+        first_load = load_all_manifests()
+        assert set(first_load) == {"mcu_rp2040"}
+
+        time.sleep(0.01)
+        (manifests_dir / "second.json").write_text(
+            mock_manifests()["sens_ina219"].model_dump_json()
+        )
+
+        second_load = load_all_manifests()
+        assert set(second_load) == {"mcu_rp2040", "sens_ina219"}
 
         clear_manifest_cache()
 
@@ -112,6 +140,21 @@ class TestTemplateLayoutPinTypeResolution:
 
 
 class TestStructuralValidation:
+    def test_validate_project_raises_on_structural_error_before_rules(self):
+        project = ProjectState(
+            project_id="unknown_component",
+            nodes=[Node(node_id="mystery_1", component_id="does_not_exist")],
+            nets=[
+                Net(
+                    net_id="net_gnd",
+                    net_type=NetType.GND,
+                    connections=[NetConnection(node_id="mystery_1", pin_id="GND")],
+                ),
+            ],
+        )
+        with pytest.raises(LogicCheckerError, match="unknown component_id"):
+            validate_project(project, MANIFESTS)
+
     def test_unknown_component_returns_single_structural_error(self):
         project = ProjectState(
             project_id="unknown_component",
@@ -165,6 +208,29 @@ class TestUartPolarity:
 
 
 class TestArchitectAPIErrors:
+    def test_placement_only_draft_resolves_gnd_pin_by_type(self):
+        mcu = mock_manifests()["mcu_rp2040"].model_copy(
+            update={
+                "component_id": "mcu_vss",
+                "pins": [
+                    Pin(pin_id="VCC", pin_type=PinType.POWER),
+                    Pin(pin_id="VSS", pin_type=PinType.GND),
+                    Pin(pin_id="SDA", pin_type=PinType.I2C_SDA),
+                    Pin(pin_id="SCL", pin_type=PinType.I2C_SCL),
+                ],
+            }
+        )
+        manifests = {mcu.component_id: mcu}
+        draft = SchematicDraft(
+            project_id="placement_only",
+            nodes=[Node(node_id="n1", component_id="mcu_vss")],
+            nets=[],
+        )
+
+        state = _draft_to_project_state(draft, manifests)
+        assert len(state.nets) == 1
+        assert state.nets[0].connections[0].pin_id == "VSS"
+
     def test_unknown_component_id_returns_clear_error(self):
         res = client.post(
             "/api/v1/architect/auto-wire",

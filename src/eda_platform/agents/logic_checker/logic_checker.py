@@ -345,6 +345,10 @@ def validate_project(
     project: ProjectState, manifests: dict[str, ComponentManifest]
 ) -> None:
     """Run all Logic Checker rules. Raises LogicCheckerError on first fatal violation."""
+    structural_errors = check_structural_integrity(project, manifests)
+    if structural_errors:
+        raise LogicCheckerError(structural_errors[0])
+
     check_voltage_levels(project, manifests)
     check_common_gnd(project, manifests)
     check_current_budget(project, manifests)

@@ -196,6 +196,13 @@ export const useSchematicStore = create<SchematicState>((set, get) => ({
     },
     autoWire: async () => {
       const { nodes: currentNodes, edges: currentEdges, catalog } = get();
+      if (catalog.length === 0) {
+        set({
+          autoWireStatus: "error",
+          autoWireMessage: "Component catalog is empty. Load the catalog before auto-wiring.",
+        });
+        return;
+      }
       set({
         autoWireStatus: "wiring",
         autoWireMessage: null,

@@ -50,4 +50,14 @@ describe("useSchematicStore", () => {
     expect(state.firmwareStatus).toBe("idle");
     expect(state.autoWireStatus).toBe("idle");
   });
+
+  it("rejects auto-wire when the catalog is empty", async () => {
+    useSchematicStore.setState({ catalog: [], catalogLoaded: true });
+
+    await useSchematicStore.getState().actions.autoWire();
+
+    const state = useSchematicStore.getState();
+    expect(state.autoWireStatus).toBe("error");
+    expect(state.autoWireMessage).toMatch(/catalog is empty/i);
+  });
 });
