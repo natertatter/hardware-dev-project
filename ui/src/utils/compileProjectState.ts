@@ -18,13 +18,6 @@ const BUS_PIN_TYPES: ReadonlySet<PinType> = new Set([
   "SPI_CS",
 ]);
 
-const OUTPUT_POWER_PIN_IDS: ReadonlySet<string> = new Set([
-  "3V3_OUT",
-  "3V3",
-  "5V_OUT",
-  "5V",
-]);
-
 /**
  * Union-Find (disjoint-set) for grouping electrically connected pin endpoints.
  * Two endpoints in the same connected component share one net.
@@ -200,6 +193,16 @@ export function compileProjectState(
 
   if (projectNodes.length === 0) {
     throw new Error("Cannot compile ProjectState: no nodes on canvas");
+  }
+
+  // The backend ProjectState schema requires nets to be non-empty
+  // (Pydantic `Field(..., min_length=1)`). Placing nodes without wiring any
+  // pins together compiles to zero nets, which is not a valid ProjectState —
+  // fail loudly here rather than silently returning non-compliant JSON.
+  if (nets.length === 0) {
+    throw new Error(
+      "Cannot compile ProjectState: no nets found — wire at least one pin-to-pin connection before validating"
+    );
   }
 
   return {

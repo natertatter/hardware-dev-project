@@ -21,6 +21,7 @@ interface SchematicState {
   nodes: HardwareFlowNode[];
   edges: Edge[];
   catalog: ComponentManifest[];
+  hasSeededDemo: boolean;
 
   onNodesChange: (changes: NodeChange<HardwareFlowNode>[]) => void;
   onEdgesChange: (changes: EdgeChange[]) => void;
@@ -45,6 +46,7 @@ export const useSchematicStore = create<SchematicState>((set, get) => ({
   nodes: [],
   edges: [],
   catalog: COMPONENT_CATALOG,
+  hasSeededDemo: false,
 
   onNodesChange: (changes) => {
     set({
@@ -92,11 +94,32 @@ export const useSchematicStore = create<SchematicState>((set, get) => ({
   setProjectId: (id) => set({ projectId: id }),
 }));
 
-/** Seed the canvas with an MCU and INA219 sensor for quick manual testing. */
+/**
+ * Seed the canvas with an MCU and INA219 sensor for quick manual testing.
+ *
+ * Guarded by `hasSeededDemo` in the store state (not just `nodes.length === 0`
+ * checked by the caller) because React 18 Strict Mode deliberately
+ * double-invokes effects in development (`reactStrictMode: true` in
+ * next.config.ts). A caller checking only `nodes.length === 0` from a render
+ * closure can still fire twice before the first `addNode` call is reflected
+ * in a new render, seeding duplicate nodes. Reading and flipping the guard
+ * via `get()`/`set()` on the store itself makes the seed atomic and
+ * idempotent regardless of call count, and resettable in tests via
+ * `useSchematicStore.setState({ hasSeededDemo: false })`.
+ */
 export function seedDemoSchematic(): void {
   const store = useSchematicStore.getState();
+  if (store.hasSeededDemo) return;
+  useSchematicStore.setState({ hasSeededDemo: true });
+
   const mcu = store.catalog.find((c) => c.component_id === "mcu_rp2040");
   const sensor = store.catalog.find((c) => c.component_id === "sens_ina219");
   if (mcu) store.addNode(mcu, { x: 80, y: 160 });
   if (sensor) store.addNode(sensor, { x: 480, y: 160 });
+}
+
+if (process.env.NODE_ENV !== "production" && typeof window !== "undefined") {
+  // Dev-only console debug hook: window.__schematicStore.getState()
+  (window as unknown as { __schematicStore: typeof useSchematicStore }).__schematicStore =
+    useSchematicStore;
 }

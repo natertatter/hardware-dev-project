@@ -127,4 +127,20 @@ describe("compileProjectState", () => {
     ];
     expect(() => compileProjectState(nodes, edges)).toThrow("missing sourceHandle");
   });
+
+  it("throws when nodes are placed but nothing is wired (no nets)", () => {
+    // Reflects the real UI flow: two nodes dropped on the canvas, then
+    // "Validate Architecture" clicked before drawing any edges. The result
+    // must not be a ProjectState with an empty `nets` array, since the
+    // backend schema requires at least one net.
+    const nodes = [
+      makeNode("mcu_1", "mcu_rp2040"),
+      makeNode("sensor_1", "sens_ina219"),
+    ];
+    expect(() => compileProjectState(nodes, [])).toThrow("no nets found");
+  });
+
+  it("throws when called with zero nodes", () => {
+    expect(() => compileProjectState([], [])).toThrow("no nodes on canvas");
+  });
 });
