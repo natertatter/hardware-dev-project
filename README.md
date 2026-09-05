@@ -10,6 +10,8 @@ Multi-agent swarm for robotics hardware design: datasheet ingestion → schemati
 
 ## Quick Start
 
+**How-to (at a glance):** [`docs/HOW_TO.md`](docs/HOW_TO.md)
+
 ### Full stack (Docker Compose)
 
 ```bash

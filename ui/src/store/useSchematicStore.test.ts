@@ -13,6 +13,7 @@ describe("useSchematicStore", () => {
         manifest,
       })),
       catalogLoaded: true,
+      catalogError: null,
       validationStatus: "idle",
       validationIssues: [],
       validationMessage: null,
@@ -20,6 +21,8 @@ describe("useSchematicStore", () => {
       firmwareStatus: "idle",
       firmwareOutputDir: null,
       firmwareMessage: null,
+      autoWireStatus: "idle",
+      autoWireMessage: null,
     });
   });
 
@@ -45,5 +48,16 @@ describe("useSchematicStore", () => {
     const state = useSchematicStore.getState();
     expect(state.schematicApproved).toBe(false);
     expect(state.firmwareStatus).toBe("idle");
+    expect(state.autoWireStatus).toBe("idle");
+  });
+
+  it("rejects auto-wire when the catalog is empty", async () => {
+    useSchematicStore.setState({ catalog: [], catalogLoaded: true });
+
+    await useSchematicStore.getState().actions.autoWire();
+
+    const state = useSchematicStore.getState();
+    expect(state.autoWireStatus).toBe("error");
+    expect(state.autoWireMessage).toMatch(/catalog is empty/i);
   });
 });

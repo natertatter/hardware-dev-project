@@ -11,13 +11,13 @@ import {
 } from "@xyflow/react";
 
 import { autoWireProjectState, fetchManifests, generateFirmware, validateProjectState } from "@/lib/api";
-import type { CatalogEntry, HardwareNodeData } from "@/types/schemas";
+import type { CatalogEntry, HardwareNodeData, ProjectState } from "@/types/schemas";
 import { compileProjectState } from "@/utils/compileProjectState";
 import { decompileProjectState } from "@/utils/decompileProjectState";
 
 export type ValidationStatus = "idle" | "validating" | "pass" | "fail" | "error";
-
 export type FirmwareStatus = "idle" | "generating" | "success" | "error";
+export type AutoWireStatus = "idle" | "wiring" | "success" | "error";
 
 export interface ValidationIssueView {
   rule: string;
@@ -31,6 +31,7 @@ interface SchematicState {
   edges: Edge[];
   catalog: CatalogEntry[];
   catalogLoaded: boolean;
+  catalogError: string | null;
   validationStatus: ValidationStatus;
   validationIssues: ValidationIssueView[];
   validationMessage: string | null;
@@ -38,6 +39,8 @@ interface SchematicState {
   firmwareStatus: FirmwareStatus;
   firmwareOutputDir: string | null;
   firmwareMessage: string | null;
+  autoWireStatus: AutoWireStatus;
+  autoWireMessage: string | null;
   actions: {
     onNodesChange: (changes: NodeChange<Node<HardwareNodeData>>[]) => void;
     onEdgesChange: (changes: EdgeChange[]) => void;
@@ -54,11 +57,41 @@ interface SchematicState {
 
 let nodeCounter = 0;
 
+function resetWorkflowState() {
+  return {
+    schematicApproved: false,
+    firmwareStatus: "idle" as FirmwareStatus,
+    firmwareOutputDir: null,
+    firmwareMessage: null,
+    autoWireStatus: "idle" as AutoWireStatus,
+    autoWireMessage: null,
+  };
+}
+
+function placementOnlyProjectState(
+  nodes: Node<HardwareNodeData>[],
+): Pick<ProjectState, "project_id" | "nodes" | "nets"> {
+  return {
+    project_id: "schematic_project",
+    nodes: nodes.map((node) => ({
+      node_id: node.id,
+      component_id: node.data.manifest.component_id,
+      ...(node.data.assigned_i2c_address != null
+        ? { assigned_i2c_address: node.data.assigned_i2c_address }
+        : node.data.manifest.default_i2c_address != null
+          ? { assigned_i2c_address: node.data.manifest.default_i2c_address }
+          : {}),
+    })),
+    nets: [],
+  };
+}
+
 export const useSchematicStore = create<SchematicState>((set, get) => ({
   nodes: [],
   edges: [],
   catalog: [],
   catalogLoaded: false,
+  catalogError: null,
   validationStatus: "idle",
   validationIssues: [],
   validationMessage: null,
@@ -66,23 +99,19 @@ export const useSchematicStore = create<SchematicState>((set, get) => ({
   firmwareStatus: "idle",
   firmwareOutputDir: null,
   firmwareMessage: null,
+  autoWireStatus: "idle",
+  autoWireMessage: null,
   actions: {
     onNodesChange: (changes) => {
       set({
         nodes: applyNodeChanges(changes, get().nodes),
-        schematicApproved: false,
-        firmwareStatus: "idle",
-        firmwareOutputDir: null,
-        firmwareMessage: null,
+        ...resetWorkflowState(),
       });
     },
     onEdgesChange: (changes) => {
       set({
         edges: applyEdgeChanges(changes, get().edges),
-        schematicApproved: false,
-        firmwareStatus: "idle",
-        firmwareOutputDir: null,
-        firmwareMessage: null,
+        ...resetWorkflowState(),
       });
     },
     onConnect: (connection) => {
@@ -94,10 +123,7 @@ export const useSchematicStore = create<SchematicState>((set, get) => ({
           },
           get().edges,
         ),
-        schematicApproved: false,
-        firmwareStatus: "idle",
-        firmwareOutputDir: null,
-        firmwareMessage: null,
+        ...resetWorkflowState(),
       });
     },
     addNodeFromCatalog: (entry) => {
@@ -113,28 +139,34 @@ export const useSchematicStore = create<SchematicState>((set, get) => ({
       };
       set({
         nodes: [...get().nodes, newNode],
-        schematicApproved: false,
-        firmwareStatus: "idle",
-        firmwareOutputDir: null,
-        firmwareMessage: null,
+        ...resetWorkflowState(),
       });
     },
     loadCatalog: async () => {
+      set({ catalogLoaded: false, catalogError: null });
       try {
         const manifests = await fetchManifests();
         const catalog: CatalogEntry[] = manifests.map((manifest) => ({
           label: manifest.name,
           manifest,
         }));
-        set({ catalog, catalogLoaded: true });
+        set({ catalog, catalogLoaded: true, catalogError: null });
       } catch (err) {
+        const message = err instanceof Error ? err.message : "Failed to load manifest catalog.";
         console.error("Failed to load manifest catalog:", err);
+        set({ catalog: [], catalogLoaded: false, catalogError: message });
       }
     },
     validateArchitecture: async () => {
-      set({ validationStatus: "validating", validationMessage: null });
-      const projectState = compileProjectState(get().nodes, get().edges);
+      set({
+        validationStatus: "validating",
+        validationMessage: null,
+        validationIssues: [],
+        autoWireStatus: "idle",
+        autoWireMessage: null,
+      });
       try {
+        const projectState = compileProjectState(get().nodes, get().edges);
         const result = await validateProjectState(projectState);
         if (result.valid) {
           set({
@@ -164,25 +196,37 @@ export const useSchematicStore = create<SchematicState>((set, get) => ({
     },
     autoWire: async () => {
       const { nodes: currentNodes, edges: currentEdges, catalog } = get();
-      let projectState;
-      try {
-        projectState = compileProjectState(currentNodes, currentEdges);
-      } catch {
-        // Auto-wire can run on unconnected nodes — send placement-only state.
-        projectState = {
-          project_id: "schematic_project",
-          nodes: currentNodes.map((node) => ({
-            node_id: node.id,
-            component_id: node.data.manifest.component_id,
-            ...(node.data.assigned_i2c_address != null
-              ? { assigned_i2c_address: node.data.assigned_i2c_address }
-              : node.data.manifest.default_i2c_address != null
-                ? { assigned_i2c_address: node.data.manifest.default_i2c_address }
-                : {}),
-          })),
-          nets: [],
-        };
+      if (catalog.length === 0) {
+        set({
+          autoWireStatus: "error",
+          autoWireMessage: "Component catalog is empty. Load the catalog before auto-wiring.",
+        });
+        return;
       }
+      set({
+        autoWireStatus: "wiring",
+        autoWireMessage: null,
+        validationStatus: "idle",
+        validationIssues: [],
+        validationMessage: null,
+      });
+
+      let projectState: Pick<ProjectState, "project_id" | "nodes" | "nets">;
+      if (currentEdges.length === 0) {
+        projectState = placementOnlyProjectState(currentNodes);
+      } else {
+        try {
+          projectState = compileProjectState(currentNodes, currentEdges);
+        } catch (err) {
+          set({
+            autoWireStatus: "error",
+            autoWireMessage:
+              err instanceof Error ? err.message : "Cannot compile schematic for auto-wire.",
+          });
+          return;
+        }
+      }
+
       try {
         const response = await autoWireProjectState(projectState);
         const manifests = Object.fromEntries(
@@ -193,11 +237,17 @@ export const useSchematicStore = create<SchematicState>((set, get) => ({
           manifests,
           currentNodes,
         );
-        set({ nodes, edges, schematicApproved: false, validationStatus: "idle", firmwareStatus: "idle", firmwareOutputDir: null, firmwareMessage: null });
+        set({
+          nodes,
+          edges,
+          ...resetWorkflowState(),
+          autoWireStatus: "success",
+          autoWireMessage: `Added ${response.wires_added} net(s).`,
+        });
       } catch (err) {
         set({
-          validationStatus: "error",
-          validationMessage: err instanceof Error ? err.message : "Auto-wire failed.",
+          autoWireStatus: "error",
+          autoWireMessage: err instanceof Error ? err.message : "Auto-wire failed.",
         });
       }
     },

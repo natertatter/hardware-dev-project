@@ -1,4 +1,5 @@
 import type {
+  AutoWireStatus,
   FirmwareStatus,
   ValidationIssueView,
   ValidationStatus,
@@ -9,6 +10,8 @@ interface ValidationPanelProps {
   issues: ValidationIssueView[];
   message: string | null;
   schematicApproved: boolean;
+  autoWireStatus: AutoWireStatus;
+  autoWireMessage: string | null;
   firmwareStatus: FirmwareStatus;
   firmwareOutputDir: string | null;
   firmwareMessage: string | null;
@@ -30,6 +33,13 @@ const STATUS_COLORS: Record<ValidationStatus, string> = {
   error: "text-orange-400",
 };
 
+const AUTO_WIRE_COLORS: Record<AutoWireStatus, string> = {
+  idle: "text-slate-400",
+  wiring: "text-amber-400",
+  success: "text-emerald-400",
+  error: "text-red-400",
+};
+
 const FIRMWARE_COLORS: Record<FirmwareStatus, string> = {
   idle: "text-slate-400",
   generating: "text-amber-400",
@@ -42,6 +52,8 @@ export function ValidationPanel({
   issues,
   message,
   schematicApproved,
+  autoWireStatus,
+  autoWireMessage,
   firmwareStatus,
   firmwareOutputDir,
   firmwareMessage,
@@ -60,7 +72,7 @@ export function ValidationPanel({
           Schematic approved — you can generate firmware for Raspberry Pi 4.
         </p>
       )}
-      {issues.length > 0 && (
+      {status === "fail" && issues.length > 0 && (
         <ul className="space-y-2">
           {issues.map((issue, i) => (
             <li
@@ -80,6 +92,17 @@ export function ValidationPanel({
           ))}
         </ul>
       )}
+
+      <h2 className="pt-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
+        Auto-Wire
+      </h2>
+      <p className={`text-sm font-medium ${AUTO_WIRE_COLORS[autoWireStatus]}`}>
+        {autoWireStatus === "idle" && "Not run"}
+        {autoWireStatus === "wiring" && "Wiring…"}
+        {autoWireStatus === "success" && "Wired"}
+        {autoWireStatus === "error" && "Failed"}
+      </p>
+      {autoWireMessage && <p className="text-xs text-slate-400">{autoWireMessage}</p>}
 
       <h2 className="pt-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
         Firmware (Pi 4)

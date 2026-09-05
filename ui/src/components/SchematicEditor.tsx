@@ -26,6 +26,9 @@ function SchematicCanvas() {
   const validationIssues = useSchematicStore((s) => s.validationIssues);
   const validationMessage = useSchematicStore((s) => s.validationMessage);
   const schematicApproved = useSchematicStore((s) => s.schematicApproved);
+  const catalogError = useSchematicStore((s) => s.catalogError);
+  const autoWireStatus = useSchematicStore((s) => s.autoWireStatus);
+  const autoWireMessage = useSchematicStore((s) => s.autoWireMessage);
   const firmwareStatus = useSchematicStore((s) => s.firmwareStatus);
   const firmwareOutputDir = useSchematicStore((s) => s.firmwareOutputDir);
   const firmwareMessage = useSchematicStore((s) => s.firmwareMessage);
@@ -101,8 +104,19 @@ function SchematicCanvas() {
           <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
             Component Catalog
           </h2>
-          {!catalogLoaded ? (
+          {!catalogLoaded && !catalogError ? (
             <p className="text-xs text-slate-500">Loading manifests…</p>
+          ) : catalogError ? (
+            <div className="space-y-2">
+              <p className="text-xs text-red-400">{catalogError}</p>
+              <button
+                type="button"
+                onClick={() => actions.loadCatalog()}
+                className="w-full rounded border border-slate-600 px-2 py-1.5 text-sm hover:bg-slate-900"
+              >
+                Retry
+              </button>
+            </div>
           ) : (
             <ul className="space-y-2">
               {catalog.map((entry) => (
@@ -143,6 +157,8 @@ function SchematicCanvas() {
             issues={validationIssues}
             message={validationMessage}
             schematicApproved={schematicApproved}
+            autoWireStatus={autoWireStatus}
+            autoWireMessage={autoWireMessage}
             firmwareStatus={firmwareStatus}
             firmwareOutputDir={firmwareOutputDir}
             firmwareMessage={firmwareMessage}
