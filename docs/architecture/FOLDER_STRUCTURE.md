@@ -8,6 +8,7 @@ This document defines the top-level layout for the intelligent EDA and firmware 
 hardware-dev-project/
 ├── README.md
 ├── pyproject.toml
+├── .gitignore
 ├── docs/
 │   ├── architecture/
 │   │   └── FOLDER_STRUCTURE.md       # This document

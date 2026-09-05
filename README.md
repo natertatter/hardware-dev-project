@@ -12,7 +12,7 @@ Multi-agent swarm for robotics hardware design: datasheet ingestion → schemati
 
 ```bash
 pip install -e ".[dev]"
-pytest
+python3 -m pytest -v
 ```
 
 ## Project Layout

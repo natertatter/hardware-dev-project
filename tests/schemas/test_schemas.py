@@ -248,3 +248,33 @@ class TestExampleFixtures:
         for pin_type in PinType:
             pin = Pin(pin_id=f"pin_{pin_type.value}", pin_type=pin_type)
             assert pin.pin_type == pin_type
+
+    def test_all_active_states_accepted(self):
+        for state in ActiveState:
+            pin = Pin(pin_id="P1", pin_type=PinType.GPIO_IN, active_state=state)
+            assert pin.active_state == state
+
+    def test_all_net_types_accepted(self):
+        for net_type in NetType:
+            net = Net(
+                net_id=f"net_{net_type.value.lower()}",
+                net_type=net_type,
+                connections=[NetConnection(node_id="n1", pin_id="GND")],
+            )
+            assert net.net_type == net_type
+
+    def test_i2c_address_uppercase_normalized(self):
+        manifest = ComponentManifest(
+            component_id="sens_test",
+            name="Test",
+            type=ComponentType.SENSOR,
+            power_requirements=PowerRequirements(
+                min_operating_voltage=3.0,
+                max_operating_voltage=3.3,
+                logic_level_voltage=3.3,
+                max_current_draw_ma=1.0,
+            ),
+            default_i2c_address="0X48",
+            pins=[Pin(pin_id="VCC", pin_type=PinType.POWER)],
+        )
+        assert manifest.default_i2c_address == "0x48"
