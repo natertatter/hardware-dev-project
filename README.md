@@ -13,6 +13,7 @@ Multi-agent swarm for robotics hardware design: datasheet ingestion → schemati
 ```bash
 pip install -e ".[dev]"
 python3 -m pytest -v
+python3 tests/test_logic_checker.py   # headless Logic Checker integration tests
 ```
 
 ## Project Layout
