@@ -209,7 +209,9 @@ void *task_sensor_poll(void *arg) {{
 
     uint64_t expirations;
     for (;;) {{
-        read(tfd, &expirations, sizeof(expirations));
+        if (read(tfd, &expirations, sizeof(expirations)) < 0) {{
+            continue; /* interrupted or spurious wakeup — try again next period */
+        }}
         {reads}
     }}
     return NULL;
@@ -259,6 +261,11 @@ static void spawn_thread(void *(*fn)(void *), const char *name) {{
 }}
 
 int main(void) {{
+    /* stdout is fully buffered when not attached to a TTY (e.g. under
+     * systemd) — force line buffering so status output interleaves with
+     * stderr in the correct order when tailing logs on real hardware. */
+    setvbuf(stdout, NULL, _IOLBF, 0);
+
     printf("EDA Platform firmware — project: {plan.project_id} (platform: {plan.platform})\\n");
 
     if (hal_i2c_bus_0_init() != 0) {{
