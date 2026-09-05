@@ -12,15 +12,16 @@ This document records five architectural decisions made when starting Phases 4â€
 - BYOK via env vars keeps secrets out of the repo and matches how teams already manage API keys in CI and local dev.
 - Deterministic agents (Logic Checker, template Architect) do not depend on an LLM at all, so the platform remains usable without any key configured.
 
-## 2. Firmware Target: RP2040 + FreeRTOS (Pico SDK) First
+## 2. Firmware Target: Raspberry Pi 4 (Linux) First
 
-**Decision:** Target Raspberry Pi Pico (RP2040) with FreeRTOS on the Pico SDK as the first generated firmware platform.
+**Decision:** Target Raspberry Pi 4 running Linux as the first generated firmware platform, using pthreads and standard Linux I2C/GPIO interfaces (e.g. `lgpio` / `libgpiod`).
 
 **Rationale:**
-- The mock library, manifests, and Logic Checker tests already center on RP2040 + I2C sensors (INA219).
-- Pico SDK + FreeRTOS is well documented, cheap to hardware-test, and supports the threaded concurrency model described in `docs/firmware/CONCURRENCY_STRATEGY.md`.
-- Shipping one MCU family end-to-end (schematic â†’ validated `ProjectState` â†’ HAL + tasks) proves the pipeline before adding STM32, ESP32, or other targets.
-- Pin maps and power budgets in manifests can grow incrementally per MCU rather than blocking on a universal HAL.
+- Raspberry Pi 4 is the hardware available for end-to-end testing today â€” validating on real boards matters more than optimizing for the cheapest MCU dev kit.
+- Linux SBCs map naturally to the pthreads row in `docs/firmware/CONCURRENCY_STRATEGY.md`: T0 via `SCHED_FIFO` or isolated threads, T2 I2C via kernel `i2c-dev` with mutexes, T3 on background workers.
+- Pi 4 exposes multiple I2C buses and ample RAM/CPU for iterative agent codegen without flash constraints or cross-compilation friction during early development.
+- Schematic manifests may still use RP2040 (or other MCUs) as **logical** components in the EDA canvas; the Firmware Engineer maps validated `ProjectState` to Pi 4 pin/bus assignments at codegen time. A dedicated `mcu_rpi4` manifest can be added when schematic and codegen pin maps should align.
+- Bare-metal targets (RP2040 + FreeRTOS, STM32, etc.) remain on the roadmap once the Linux pipeline is proven.
 
 ## 3. Deployment: Docker Compose for Demos + Dual-Server Local Dev
 
@@ -59,7 +60,7 @@ This document records five architectural decisions made when starting Phases 4â€
 | # | Topic | Choice |
 |---|--------|--------|
 | 1 | LLM provider | Abstraction + Anthropic default, BYOK |
-| 2 | Firmware target | RP2040 + FreeRTOS (Pico SDK) |
+| 2 | Firmware target | Raspberry Pi 4 (Linux, pthreads) |
 | 3 | Deployment | Docker Compose + local dual-server dev |
 | 4 | Architect v1 | Template I2C auto-wire (deterministic) |
 | 5 | Approval UX | Validate, then explicit Approve Schematic |
