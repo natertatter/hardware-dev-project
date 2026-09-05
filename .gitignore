@@ -6,3 +6,11 @@ dist/
 build/
 .pytest_cache/
 *.egg
+
+# Node / Next.js
+node_modules/
+.next/
+out/
+*.tsbuildinfo
+ui/node_modules/
+ui/.next/

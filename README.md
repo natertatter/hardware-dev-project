@@ -10,10 +10,20 @@ Multi-agent swarm for robotics hardware design: datasheet ingestion → schemati
 
 ## Quick Start
 
+### Backend (Python)
+
 ```bash
 pip install -e ".[dev]"
 python3 -m pytest -v
 python3 tests/test_logic_checker.py   # headless Logic Checker integration tests
+```
+
+### Frontend (Next.js)
+
+```bash
+cd ui && npm install
+npm run dev        # http://localhost:3000
+npm run test       # net compiler unit tests
 ```
 
 ## Project Layout
@@ -26,4 +36,4 @@ python3 tests/test_logic_checker.py   # headless Logic Checker integration tests
 | `hardware_library/` | Datasheets and component manifests |
 | `projects/` | Per-project schematic state |
 | `generated/firmware/` | Output HAL and application code |
-| `ui/` | Future web schematic editor |
+| `ui/` | Next.js + React Flow schematic editor |
