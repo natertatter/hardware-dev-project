@@ -5,12 +5,14 @@ from fastapi import APIRouter, HTTPException
 from eda_platform.agents.architect.template_layout import template_i2c_layout
 from eda_platform.api.manifest_loader import load_all_manifests
 from eda_platform.api.schemas import AutoWireRequest, AutoWireResponse
-from eda_platform.schemas import Net, NetConnection, NetType, ProjectState
+from eda_platform.schemas import ComponentManifest, Net, NetConnection, NetType, PinType, ProjectState
 
 router = APIRouter(prefix="/api/v1", tags=["architect"])
 
 
-def _draft_to_project_state(draft) -> ProjectState:
+def _draft_to_project_state(
+    draft, manifests: dict[str, ComponentManifest]
+) -> ProjectState:
     """Convert a UI schematic draft into a ProjectState for template processing."""
     if draft.nets:
         return ProjectState(
@@ -18,6 +20,14 @@ def _draft_to_project_state(draft) -> ProjectState:
             nodes=draft.nodes,
             nets=draft.nets,
         )
+
+    first = draft.nodes[0]
+    gnd_pin_id = "GND"
+    manifest = manifests.get(first.component_id)
+    if manifest is not None:
+        gnd_pins = [p for p in manifest.pins if p.pin_type == PinType.GND]
+        if gnd_pins:
+            gnd_pin_id = gnd_pins[0].pin_id
 
     # Placement-only draft: synthesize a throwaway net so ProjectState validates.
     return ProjectState(
@@ -28,7 +38,7 @@ def _draft_to_project_state(draft) -> ProjectState:
                 net_id="_draft_placeholder",
                 net_type=NetType.SIGNAL,
                 connections=[
-                    NetConnection(node_id=draft.nodes[0].node_id, pin_id="GND"),
+                    NetConnection(node_id=first.node_id, pin_id=gnd_pin_id),
                 ],
             )
         ],
@@ -37,7 +47,7 @@ def _draft_to_project_state(draft) -> ProjectState:
 
 @router.post("/architect/auto-wire", response_model=AutoWireResponse)
 def auto_wire_schematic(body: AutoWireRequest) -> AutoWireResponse:
-    manifests = load_all_manifests()
+    manifests = body.manifests if body.manifests is not None else load_all_manifests()
     if not manifests:
         raise HTTPException(status_code=500, detail="No manifests loaded on server")
 
@@ -46,7 +56,7 @@ def auto_wire_schematic(body: AutoWireRequest) -> AutoWireResponse:
 
     try:
         updated_state, wires_added = template_i2c_layout(
-            _draft_to_project_state(draft), manifests
+            _draft_to_project_state(draft, manifests), manifests
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc

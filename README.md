@@ -10,6 +10,8 @@ Multi-agent swarm for robotics hardware design: datasheet ingestion → schemati
 
 ## Quick Start
 
+**How-to (at a glance):** [`docs/HOW_TO.md`](docs/HOW_TO.md)
+
 ### Full stack (Docker Compose)
 
 ```bash
@@ -43,8 +45,21 @@ npm run test       # net compiler + store unit tests
 | GET | `/api/v1/manifests` | Component catalog |
 | POST | `/api/v1/validate` | Run Logic Checker on `ProjectState` |
 | POST | `/api/v1/architect/auto-wire` | Template I2C auto-wiring |
+| POST | `/api/v1/firmware/generate` | Generate pthreads C firmware for Raspberry Pi 4 |
 
 See `docs/architecture/ENGINEERING_DECISIONS.md` for Phase 4–8 design rationale.
+
+### Firmware output (Phase 9)
+
+After validating and approving a schematic in the UI, click **Generate Firmware**. Output is written to `generated/firmware/<project_id>/`.
+
+On your Raspberry Pi 4:
+
+```bash
+cd generated/firmware/<project_id>
+make
+sudo ./<project_id>_firmware   # requires I2C enabled (raspi-config)
+```
 
 ## Project Layout
 

@@ -203,15 +203,6 @@ def _node_has_power_connection(
     return False
 
 
-def _node_has_gnd_connection(node_id: str, project: ProjectState) -> bool:
-    for net in project.nets:
-        if net.net_type != NetType.GND:
-            continue
-        if node_id in _nodes_on_net(net):
-            return True
-    return False
-
-
 def check_common_gnd(
     project: ProjectState, manifests: dict[str, ComponentManifest]
 ) -> None:
@@ -233,13 +224,6 @@ def check_common_gnd(
         if node_id not in gnd_nodes:
             raise LogicCheckerError(
                 f"powered node '{node_id}' is not connected to a GND net"
-            )
-
-    if len(gnd_nodes) < len(powered_nodes):
-        ungrounded = [n for n in powered_nodes if n not in gnd_nodes]
-        if ungrounded:
-            raise LogicCheckerError(
-                f"nodes missing GND connection: {', '.join(ungrounded)}"
             )
 
 
@@ -272,6 +256,8 @@ def check_current_budget(
             else:
                 total_draw_ma += manifest.power_requirements.max_current_draw_ma
 
+        # When the MCU source pin has no max_current_source_ma (e.g. VBUS input),
+        # we cannot enforce a budget on this net — schema has no per-pin draw field.
         if source_limit_ma is not None and total_draw_ma > source_limit_ma:
             raise LogicCheckerError(
                 f"current budget exceeded on net '{net.net_id}': "
@@ -322,6 +308,15 @@ def check_uart_polarity(
         if len(pin_types_on_net) < 2:
             continue
 
+        tx_count = sum(1 for _, _, pt in pin_types_on_net if pt == PinType.UART_TX)
+        rx_count = sum(1 for _, _, pt in pin_types_on_net if pt == PinType.UART_RX)
+
+        if tx_count > 1 or rx_count > 1:
+            raise LogicCheckerError(
+                f"UART polarity violation on net '{net.net_id}': "
+                f"multiple TX ({tx_count}) or RX ({rx_count}) drivers on one net"
+            )
+
         types = {pt for _, _, pt in pin_types_on_net}
         if types == {PinType.UART_TX} or types == {PinType.UART_RX}:
             raise LogicCheckerError(
@@ -350,6 +345,10 @@ def validate_project(
     project: ProjectState, manifests: dict[str, ComponentManifest]
 ) -> None:
     """Run all Logic Checker rules. Raises LogicCheckerError on first fatal violation."""
+    structural_errors = check_structural_integrity(project, manifests)
+    if structural_errors:
+        raise LogicCheckerError(structural_errors[0])
+
     check_voltage_levels(project, manifests)
     check_common_gnd(project, manifests)
     check_current_budget(project, manifests)
@@ -357,3 +356,42 @@ def validate_project(
     check_output_conflicts(project, manifests)
     check_uart_polarity(project, manifests)
     check_i2c_collisions(project, manifests)
+
+
+def check_structural_integrity(
+    project: ProjectState, manifests: dict[str, ComponentManifest]
+) -> list[str]:
+    """Return fatal structural error messages before per-rule checks run.
+
+    Validates that every node references a known manifest and every net
+    connection references a real pin_id on that manifest.
+    """
+    errors: list[str] = []
+    node_ids = {n.node_id for n in project.nodes}
+
+    for node in project.nodes:
+        if node.component_id not in manifests:
+            errors.append(
+                f"node '{node.node_id}' references unknown component_id "
+                f"'{node.component_id}'"
+            )
+
+    for net in project.nets:
+        for conn in net.connections:
+            if conn.node_id not in node_ids:
+                errors.append(
+                    f"net '{net.net_id}' references unknown node_id '{conn.node_id}'"
+                )
+                continue
+            manifest = manifests.get(
+                next(n.component_id for n in project.nodes if n.node_id == conn.node_id)
+            )
+            if manifest is None:
+                continue
+            if _find_pin(manifest, conn.pin_id) is None:
+                errors.append(
+                    f"net '{net.net_id}': node '{conn.node_id}' has no pin "
+                    f"'{conn.pin_id}'"
+                )
+
+    return errors

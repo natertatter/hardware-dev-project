@@ -21,6 +21,14 @@ export interface AutoWireResponse {
   wires_added: number;
 }
 
+export interface GenerateFirmwareResponse {
+  success: boolean;
+  project_id: string;
+  output_dir: string;
+  files_written: string[];
+  message: string;
+}
+
 async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
     ...init,
@@ -58,5 +66,15 @@ export async function autoWireProjectState(
   return apiFetch<AutoWireResponse>("/api/v1/architect/auto-wire", {
     method: "POST",
     body: JSON.stringify({ project_state: projectState }),
+  });
+}
+
+export async function generateFirmware(
+  projectState: ProjectState,
+  approved: boolean
+): Promise<GenerateFirmwareResponse> {
+  return apiFetch<GenerateFirmwareResponse>("/api/v1/firmware/generate", {
+    method: "POST",
+    body: JSON.stringify({ project_state: projectState, approved }),
   });
 }

@@ -8,6 +8,7 @@ from eda_platform.agents.logic_checker.logic_checker import (
     check_i2c_collisions,
     check_output_conflicts,
     check_pin_exclusivity,
+    check_structural_integrity,
     check_uart_polarity,
     check_voltage_levels,
 )
@@ -29,17 +30,36 @@ def validate_project_collect(
     project: ProjectState, manifests: dict[str, ComponentManifest]
 ) -> ValidationResult:
     """Run every rule and return all fatal issues (does not stop at first failure)."""
+    structural_messages = check_structural_integrity(project, manifests)
+    if structural_messages:
+        return ValidationResult(
+            valid=False,
+            errors=[
+                ValidationIssue(
+                    rule="structural_integrity",
+                    severity="fatal",
+                    message=message,
+                )
+                for message in structural_messages
+            ],
+        )
+
     issues: list[ValidationIssue] = []
+    seen_messages: set[str] = set()
 
     for rule_name, check_fn in _ALL_CHECKS:
         try:
             check_fn(project, manifests)
         except LogicCheckerError as exc:
+            message = str(exc)
+            if message in seen_messages:
+                continue
+            seen_messages.add(message)
             issues.append(
                 ValidationIssue(
                     rule=rule_name,
                     severity="fatal",
-                    message=str(exc),
+                    message=message,
                 )
             )
 
