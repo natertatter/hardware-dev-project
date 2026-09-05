@@ -1,3 +1,4 @@
+import { create } from "zustand";
 import {
   addEdge,
   applyEdgeChanges,
@@ -7,119 +8,183 @@ import {
   type EdgeChange,
   type Node,
   type NodeChange,
-  type OnConnect,
 } from "@xyflow/react";
-import { create } from "zustand";
 
-import { COMPONENT_CATALOG } from "@/data/mockCatalog";
-import type { ComponentManifest, HardwareNodeData } from "@/types/schemas";
+import { autoWireProjectState, fetchManifests, validateProjectState } from "@/lib/api";
+import type { CatalogEntry, HardwareNodeData } from "@/types/schemas";
+import { compileProjectState } from "@/utils/compileProjectState";
+import { decompileProjectState } from "@/utils/decompileProjectState";
 
-export type HardwareFlowNode = Node<HardwareNodeData>;
+export type ValidationStatus = "idle" | "validating" | "pass" | "fail" | "error";
+
+export interface ValidationIssueView {
+  rule: string;
+  message: string;
+  node_id?: string;
+  net_id?: string;
+}
 
 interface SchematicState {
-  projectId: string;
-  nodes: HardwareFlowNode[];
+  nodes: Node<HardwareNodeData>[];
   edges: Edge[];
-  catalog: ComponentManifest[];
-  hasSeededDemo: boolean;
-
-  onNodesChange: (changes: NodeChange<HardwareFlowNode>[]) => void;
-  onEdgesChange: (changes: EdgeChange[]) => void;
-  onConnect: OnConnect;
-  addNode: (manifest: ComponentManifest, position?: { x: number; y: number }) => void;
-  setProjectId: (id: string) => void;
+  catalog: CatalogEntry[];
+  catalogLoaded: boolean;
+  validationStatus: ValidationStatus;
+  validationIssues: ValidationIssueView[];
+  validationMessage: string | null;
+  schematicApproved: boolean;
+  actions: {
+    onNodesChange: (changes: NodeChange<Node<HardwareNodeData>>[]) => void;
+    onEdgesChange: (changes: EdgeChange[]) => void;
+    onConnect: (connection: Connection) => void;
+    addNodeFromCatalog: (entry: CatalogEntry) => void;
+    loadCatalog: () => Promise<void>;
+    validateArchitecture: () => Promise<void>;
+    autoWire: () => Promise<void>;
+    approveSchematic: () => void;
+    resetApproval: () => void;
+  };
 }
 
 let nodeCounter = 0;
 
-function nextNodeId(componentId: string): string {
-  nodeCounter += 1;
-  return `${componentId}_${nodeCounter}`;
-}
-
-function defaultPosition(index: number): { x: number; y: number } {
-  return { x: 120 + index * 320, y: 120 + (index % 2) * 80 };
-}
-
 export const useSchematicStore = create<SchematicState>((set, get) => ({
-  projectId: "schematic_project",
   nodes: [],
   edges: [],
-  catalog: COMPONENT_CATALOG,
-  hasSeededDemo: false,
-
-  onNodesChange: (changes) => {
-    set({
-      nodes: applyNodeChanges(changes, get().nodes),
-    });
-  },
-
-  onEdgesChange: (changes) => {
-    set({
-      edges: applyEdgeChanges(changes, get().edges),
-    });
-  },
-
-  onConnect: (connection: Connection) => {
-    set({
-      edges: addEdge(
-        {
-          ...connection,
-          id: `edge_${connection.source}_${connection.sourceHandle}_${connection.target}_${connection.targetHandle}`,
+  catalog: [],
+  catalogLoaded: false,
+  validationStatus: "idle",
+  validationIssues: [],
+  validationMessage: null,
+  schematicApproved: false,
+  actions: {
+    onNodesChange: (changes) => {
+      set({
+        nodes: applyNodeChanges(changes, get().nodes),
+        schematicApproved: false,
+      });
+    },
+    onEdgesChange: (changes) => {
+      set({
+        edges: applyEdgeChanges(changes, get().edges),
+        schematicApproved: false,
+      });
+    },
+    onConnect: (connection) => {
+      set({
+        edges: addEdge(
+          {
+            ...connection,
+            id: `edge-${connection.source}-${connection.sourceHandle}-${connection.target}-${connection.targetHandle}`,
+          },
+          get().edges,
+        ),
+        schematicApproved: false,
+      });
+    },
+    addNodeFromCatalog: (entry) => {
+      nodeCounter += 1;
+      const newNode: Node<HardwareNodeData> = {
+        id: `node-${entry.manifest.component_id}-${nodeCounter}`,
+        type: "hardware",
+        position: { x: 120 + nodeCounter * 40, y: 80 + nodeCounter * 30 },
+        data: {
+          label: entry.label,
+          manifest: entry.manifest,
         },
-        get().edges
-      ),
-    });
+      };
+      set({
+        nodes: [...get().nodes, newNode],
+        schematicApproved: false,
+      });
+    },
+    loadCatalog: async () => {
+      try {
+        const manifests = await fetchManifests();
+        const catalog: CatalogEntry[] = manifests.map((manifest) => ({
+          label: manifest.name,
+          manifest,
+        }));
+        set({ catalog, catalogLoaded: true });
+      } catch (err) {
+        console.error("Failed to load manifest catalog:", err);
+      }
+    },
+    validateArchitecture: async () => {
+      set({ validationStatus: "validating", validationMessage: null });
+      const projectState = compileProjectState(get().nodes, get().edges);
+      try {
+        const result = await validateProjectState(projectState);
+        if (result.valid) {
+          set({
+            validationStatus: "pass",
+            validationIssues: [],
+            validationMessage: "Architecture passed all validation rules.",
+          });
+        } else {
+          set({
+            validationStatus: "fail",
+            validationIssues: result.errors.map((issue) => ({
+              rule: issue.rule,
+              message: issue.message,
+              node_id: issue.node_id ?? undefined,
+              net_id: issue.net_id ?? undefined,
+            })),
+            validationMessage: `${result.errors.length} issue(s) found.`,
+          });
+        }
+      } catch (err) {
+        set({
+          validationStatus: "error",
+          validationIssues: [],
+          validationMessage: err instanceof Error ? err.message : "Validation request failed.",
+        });
+      }
+    },
+    autoWire: async () => {
+      const { nodes: currentNodes, edges: currentEdges, catalog } = get();
+      let projectState;
+      try {
+        projectState = compileProjectState(currentNodes, currentEdges);
+      } catch {
+        // Auto-wire can run on unconnected nodes — send placement-only state.
+        projectState = {
+          project_id: "schematic_project",
+          nodes: currentNodes.map((node) => ({
+            node_id: node.id,
+            component_id: node.data.manifest.component_id,
+            ...(node.data.assigned_i2c_address != null
+              ? { assigned_i2c_address: node.data.assigned_i2c_address }
+              : node.data.manifest.default_i2c_address != null
+                ? { assigned_i2c_address: node.data.manifest.default_i2c_address }
+                : {}),
+          })),
+          nets: [],
+        };
+      }
+      try {
+        const response = await autoWireProjectState(projectState);
+        const manifests = Object.fromEntries(
+          catalog.map((entry) => [entry.manifest.component_id, entry.manifest]),
+        );
+        const { nodes, edges } = decompileProjectState(
+          response.project_state,
+          manifests,
+          currentNodes,
+        );
+        set({ nodes, edges, schematicApproved: false, validationStatus: "idle" });
+      } catch (err) {
+        set({
+          validationStatus: "error",
+          validationMessage: err instanceof Error ? err.message : "Auto-wire failed.",
+        });
+      }
+    },
+    approveSchematic: () => {
+      if (get().validationStatus === "pass") {
+        set({ schematicApproved: true });
+      }
+    },
+    resetApproval: () => set({ schematicApproved: false }),
   },
-
-  addNode: (manifest, position) => {
-    const { nodes } = get();
-    const id = nextNodeId(manifest.component_id);
-    const pos = position ?? defaultPosition(nodes.length);
-
-    const newNode: HardwareFlowNode = {
-      id,
-      type: "hardware",
-      position: pos,
-      data: {
-        manifest,
-        label: manifest.name,
-        assigned_i2c_address: manifest.default_i2c_address ?? null,
-      },
-    };
-
-    set({ nodes: [...nodes, newNode] });
-  },
-
-  setProjectId: (id) => set({ projectId: id }),
 }));
-
-/**
- * Seed the canvas with an MCU and INA219 sensor for quick manual testing.
- *
- * Guarded by `hasSeededDemo` in the store state (not just `nodes.length === 0`
- * checked by the caller) because React 18 Strict Mode deliberately
- * double-invokes effects in development (`reactStrictMode: true` in
- * next.config.ts). A caller checking only `nodes.length === 0` from a render
- * closure can still fire twice before the first `addNode` call is reflected
- * in a new render, seeding duplicate nodes. Reading and flipping the guard
- * via `get()`/`set()` on the store itself makes the seed atomic and
- * idempotent regardless of call count, and resettable in tests via
- * `useSchematicStore.setState({ hasSeededDemo: false })`.
- */
-export function seedDemoSchematic(): void {
-  const store = useSchematicStore.getState();
-  if (store.hasSeededDemo) return;
-  useSchematicStore.setState({ hasSeededDemo: true });
-
-  const mcu = store.catalog.find((c) => c.component_id === "mcu_rp2040");
-  const sensor = store.catalog.find((c) => c.component_id === "sens_ina219");
-  if (mcu) store.addNode(mcu, { x: 80, y: 160 });
-  if (sensor) store.addNode(sensor, { x: 480, y: 160 });
-}
-
-if (process.env.NODE_ENV !== "production" && typeof window !== "undefined") {
-  // Dev-only console debug hook: window.__schematicStore.getState()
-  (window as unknown as { __schematicStore: typeof useSchematicStore }).__schematicStore =
-    useSchematicStore;
-}

@@ -74,6 +74,12 @@ export interface ProjectState {
   nets: Net[];
 }
 
+/** Catalog sidebar entry derived from a server manifest. */
+export interface CatalogEntry {
+  label: string;
+  manifest: ComponentManifest;
+}
+
 /** Payload stored on each React Flow hardware node. */
 export interface HardwareNodeData {
   manifest: ComponentManifest;

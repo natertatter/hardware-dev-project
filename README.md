@@ -10,10 +10,19 @@ Multi-agent swarm for robotics hardware design: datasheet ingestion → schemati
 
 ## Quick Start
 
+### Full stack (Docker Compose)
+
+```bash
+docker compose up --build
+# API: http://localhost:8000/health
+# UI:  http://localhost:3000
+```
+
 ### Backend (Python)
 
 ```bash
 pip install -e ".[dev]"
+uvicorn eda_platform.api.main:app --reload --port 8000
 python3 -m pytest -v
 python3 tests/test_logic_checker.py   # headless Logic Checker integration tests
 ```
@@ -22,9 +31,20 @@ python3 tests/test_logic_checker.py   # headless Logic Checker integration tests
 
 ```bash
 cd ui && npm install
-npm run dev        # http://localhost:3000
-npm run test       # net compiler unit tests
+NEXT_PUBLIC_API_URL=http://localhost:8000 npm run dev   # http://localhost:3000
+npm run test       # net compiler + store unit tests
 ```
+
+### API Endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/health` | Liveness check |
+| GET | `/api/v1/manifests` | Component catalog |
+| POST | `/api/v1/validate` | Run Logic Checker on `ProjectState` |
+| POST | `/api/v1/architect/auto-wire` | Template I2C auto-wiring |
+
+See `docs/architecture/ENGINEERING_DECISIONS.md` for Phase 4–8 design rationale.
 
 ## Project Layout
 

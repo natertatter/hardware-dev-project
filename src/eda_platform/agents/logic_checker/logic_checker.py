@@ -183,6 +183,153 @@ def check_i2c_collisions(
             addresses[address] = conn.node_id
 
 
+def _nodes_on_net(net: Net) -> set[str]:
+    return {c.node_id for c in net.connections}
+
+
+def _node_has_power_connection(
+    node_id: str, project: ProjectState, manifests: dict[str, ComponentManifest]
+) -> bool:
+    for net in project.nets:
+        if net.net_type != NetType.POWER:
+            continue
+        for conn in net.connections:
+            if conn.node_id != node_id:
+                continue
+            manifest = _manifest_for_node(conn.node_id, project, manifests)
+            pin = _find_pin(manifest, conn.pin_id)
+            if pin and pin.pin_type == PinType.POWER:
+                return True
+    return False
+
+
+def _node_has_gnd_connection(node_id: str, project: ProjectState) -> bool:
+    for net in project.nets:
+        if net.net_type != NetType.GND:
+            continue
+        if node_id in _nodes_on_net(net):
+            return True
+    return False
+
+
+def check_common_gnd(
+    project: ProjectState, manifests: dict[str, ComponentManifest]
+) -> None:
+    """Every powered node must share a common GND net."""
+    powered_nodes = [
+        n.node_id
+        for n in project.nodes
+        if _node_has_power_connection(n.node_id, project, manifests)
+    ]
+    if not powered_nodes:
+        return
+
+    gnd_nodes: set[str] = set()
+    for net in project.nets:
+        if net.net_type == NetType.GND:
+            gnd_nodes.update(_nodes_on_net(net))
+
+    for node_id in powered_nodes:
+        if node_id not in gnd_nodes:
+            raise LogicCheckerError(
+                f"powered node '{node_id}' is not connected to a GND net"
+            )
+
+    if len(gnd_nodes) < len(powered_nodes):
+        ungrounded = [n for n in powered_nodes if n not in gnd_nodes]
+        if ungrounded:
+            raise LogicCheckerError(
+                f"nodes missing GND connection: {', '.join(ungrounded)}"
+            )
+
+
+def check_current_budget(
+    project: ProjectState, manifests: dict[str, ComponentManifest]
+) -> None:
+    """Sum of peripheral current draw on a POWER net must not exceed MCU source limit."""
+    for net in project.nets:
+        if net.net_type != NetType.POWER:
+            continue
+
+        total_draw_ma = 0.0
+        source_limit_ma: float | None = None
+        source_pin_id: str | None = None
+        source_node_id: str | None = None
+
+        for conn in net.connections:
+            manifest = _manifest_for_node(conn.node_id, project, manifests)
+            pin = _find_pin(manifest, conn.pin_id)
+            if pin is None:
+                raise LogicCheckerError(
+                    f"net '{net.net_id}': node '{conn.node_id}' has no pin '{conn.pin_id}'"
+                )
+
+            if manifest.type == ComponentType.MCU and pin.pin_type == PinType.POWER:
+                if pin.max_current_source_ma is not None:
+                    source_limit_ma = pin.max_current_source_ma
+                    source_pin_id = conn.pin_id
+                    source_node_id = conn.node_id
+            else:
+                total_draw_ma += manifest.power_requirements.max_current_draw_ma
+
+        if source_limit_ma is not None and total_draw_ma > source_limit_ma:
+            raise LogicCheckerError(
+                f"current budget exceeded on net '{net.net_id}': "
+                f"total draw {total_draw_ma}mA exceeds MCU pin '{source_pin_id}' "
+                f"on '{source_node_id}' limit of {source_limit_ma}mA"
+            )
+
+
+def check_output_conflicts(
+    project: ProjectState, manifests: dict[str, ComponentManifest]
+) -> None:
+    """Output pins (GPIO_OUT) cannot connect to other output pins on the same net."""
+    for net in project.nets:
+        output_pins: list[tuple[str, str]] = []
+        for conn in net.connections:
+            manifest = _manifest_for_node(conn.node_id, project, manifests)
+            pin = _find_pin(manifest, conn.pin_id)
+            if pin is None:
+                raise LogicCheckerError(
+                    f"net '{net.net_id}': node '{conn.node_id}' has no pin '{conn.pin_id}'"
+                )
+            if pin.pin_type == PinType.GPIO_OUT:
+                output_pins.append((conn.node_id, conn.pin_id))
+
+        if len(output_pins) > 1:
+            pins_desc = ", ".join(f"{nid}:{pid}" for nid, pid in output_pins)
+            raise LogicCheckerError(
+                f"output-to-output conflict on net '{net.net_id}': {pins_desc}"
+            )
+
+
+def check_uart_polarity(
+    project: ProjectState, manifests: dict[str, ComponentManifest]
+) -> None:
+    """UART TX pins may only share a net with UART RX pins (and vice versa)."""
+    for net in project.nets:
+        pin_types_on_net: list[tuple[str, str, PinType]] = []
+        for conn in net.connections:
+            manifest = _manifest_for_node(conn.node_id, project, manifests)
+            pin = _find_pin(manifest, conn.pin_id)
+            if pin is None:
+                raise LogicCheckerError(
+                    f"net '{net.net_id}': node '{conn.node_id}' has no pin '{conn.pin_id}'"
+                )
+            if pin.pin_type in (PinType.UART_TX, PinType.UART_RX):
+                pin_types_on_net.append((conn.node_id, conn.pin_id, pin.pin_type))
+
+        if len(pin_types_on_net) < 2:
+            continue
+
+        types = {pt for _, _, pt in pin_types_on_net}
+        if types == {PinType.UART_TX} or types == {PinType.UART_RX}:
+            raise LogicCheckerError(
+                f"UART polarity violation on net '{net.net_id}': "
+                f"TX must connect to RX, not to another TX or RX"
+            )
+
+
 def _net_is_i2c_bus(
     net: Net, project: ProjectState, manifests: dict[str, ComponentManifest]
 ) -> bool:
@@ -202,7 +349,11 @@ def _net_is_i2c_bus(
 def validate_project(
     project: ProjectState, manifests: dict[str, ComponentManifest]
 ) -> None:
-    """Run all Logic Checker rules. Raises LogicCheckerError on fatal violations."""
+    """Run all Logic Checker rules. Raises LogicCheckerError on first fatal violation."""
     check_voltage_levels(project, manifests)
+    check_common_gnd(project, manifests)
+    check_current_budget(project, manifests)
     check_pin_exclusivity(project, manifests)
+    check_output_conflicts(project, manifests)
+    check_uart_polarity(project, manifests)
     check_i2c_collisions(project, manifests)
