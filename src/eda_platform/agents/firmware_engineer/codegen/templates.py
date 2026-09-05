@@ -240,6 +240,19 @@ def main_c(plan: SchedulingPlan, sensors: list[dict]) -> str:
     has_sensor_poll = any(t.task_id == "task_sensor_poll" for t in plan.tasks)
     has_background = any(t.task_id == "task_background" for t in plan.tasks)
 
+    # Precomputed outside the f-string: Python 3.11 (our declared minimum,
+    # see pyproject.toml `requires-python`) disallows backslash escapes
+    # inside f-string `{...}` expressions, so the embedded C string literals
+    # below can't be built inline within the template's f-string braces.
+    sensor_poll_extern = "    extern void *task_sensor_poll(void *);" if has_sensor_poll else ""
+    sensor_poll_spawn = (
+        '    spawn_thread(task_sensor_poll, "task_sensor_poll");' if has_sensor_poll else ""
+    )
+    background_extern = "    extern void *task_background(void *);" if has_background else ""
+    background_spawn = (
+        '    spawn_thread(task_background, "task_background");' if has_background else ""
+    )
+
     return f"""/* Auto-generated firmware entry point — {plan.project_id} */
 #include <pthread.h>
 #include <stdio.h>
@@ -273,10 +286,10 @@ int main(void) {{
         return 1;
     }}
 
-{"    extern void *task_sensor_poll(void *);" if has_sensor_poll else ""}
-{"    spawn_thread(task_sensor_poll, \"task_sensor_poll\");" if has_sensor_poll else ""}
-{"    extern void *task_background(void *);" if has_background else ""}
-{"    spawn_thread(task_background, \"task_background\");" if has_background else ""}
+{sensor_poll_extern}
+{sensor_poll_spawn}
+{background_extern}
+{background_spawn}
 
     /* Thin supervisor — no hardware logic in main */
     for (;;) {{
