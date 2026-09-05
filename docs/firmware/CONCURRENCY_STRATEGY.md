@@ -9,6 +9,18 @@ This document defines how the **Firmware Engineer** agent classifies components 
 3. **Fail loud on ambiguity** — If a component cannot be classified into exactly one scheduling tier, the agent emits a fatal error rather than guessing.
 4. **Platform-agnostic tiers** — Tiers describe *intent*; the target runtime (FreeRTOS, pthreads, asyncio) is selected at codegen time.
 
+## Execution Contexts (Task 2 Mapping)
+
+The Firmware Agent maps every classified component into exactly one of three execution contexts:
+
+| Execution Context | Description | Tier Mapping |
+|-------------------|-------------|--------------|
+| **Main loop** | Thin supervisor only — init, spawn workers, watchdog | MCU `main()`; no peripheral logic |
+| **Async tasks** | Cooperative or event-driven work that must not block real-time control | T1 (periodic), T2 (bus/UART I/O), T3 (background) |
+| **Separate processes / threads** | Isolated, preemptive contexts for deadline-critical control | T0 (dedicated high-priority thread or process) |
+
+On bare-metal MCUs, T0/T1/T2/T3 map to FreeRTOS tasks (separate preemptive threads). On Linux SBCs, T0 may use a `SCHED_FIFO` thread or a child process for hard isolation; T2 async I/O uses coroutines or a thread pool. The agent never places hardware logic in the main loop.
+
 ## Execution Tiers
 
 | Tier | Name | Description | Typical Runtime Mapping |

@@ -33,9 +33,11 @@ hardware-dev-project/
 ├── hardware_library/                   # Persistent hardware knowledge base
 │   ├── datasheets/                     # Source PDF datasheets (Librarian input)
 │   └── manifests/                      # Validated ComponentManifest JSON files
+│       ├── *.example.json              # Reference fixtures (validated by tests)
 │
 ├── projects/                           # User project artifacts
-│   └── <project_id>/                   # Per-project ProjectState & metadata
+│   ├── <project_id>/                   # Per-project ProjectState & metadata
+│   └── *.example.json                  # Reference ProjectState fixtures
 │
 ├── generated/                          # Agent output (never hand-edited)
 │   └── firmware/                       # HAL + application code from Firmware Agent

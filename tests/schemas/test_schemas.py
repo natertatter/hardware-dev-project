@@ -1,5 +1,8 @@
 """Tests for ComponentManifest and ProjectState Pydantic schemas."""
 
+import json
+from pathlib import Path
+
 import pytest
 from pydantic import ValidationError
 
@@ -16,6 +19,8 @@ from eda_platform.schemas import (
     PowerRequirements,
     ProjectState,
 )
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
 def _sample_manifest() -> ComponentManifest:
@@ -161,3 +166,85 @@ class TestProjectState:
     def test_invalid_i2c_address_on_node(self):
         with pytest.raises(ValidationError):
             Node(node_id="s1", component_id="sens_x", assigned_i2c_address="not_hex")
+
+    def test_duplicate_net_ids_rejected(self):
+        with pytest.raises(ValidationError):
+            ProjectState(
+                project_id="dup_net_test",
+                nodes=[Node(node_id="mcu_1", component_id="mcu_rp2040")],
+                nets=[
+                    Net(
+                        net_id="net_gnd",
+                        net_type=NetType.GND,
+                        connections=[NetConnection(node_id="mcu_1", pin_id="GND")],
+                    ),
+                    Net(
+                        net_id="net_gnd",
+                        net_type=NetType.POWER,
+                        connections=[NetConnection(node_id="mcu_1", pin_id="VCC")],
+                    ),
+                ],
+            )
+
+    def test_unknown_node_id_in_connection_rejected(self):
+        with pytest.raises(ValidationError):
+            ProjectState(
+                project_id="bad_ref_test",
+                nodes=[Node(node_id="mcu_1", component_id="mcu_rp2040")],
+                nets=[
+                    Net(
+                        net_id="net_gnd",
+                        net_type=NetType.GND,
+                        connections=[NetConnection(node_id="missing_node", pin_id="GND")],
+                    ),
+                ],
+            )
+
+    def test_deserialize_from_json_string(self):
+        raw = json.dumps(
+            {
+                "project_id": "json_test",
+                "nodes": [{"node_id": "n1", "component_id": "mcu_rp2040"}],
+                "nets": [
+                    {
+                        "net_id": "net_gnd",
+                        "net_type": "GND",
+                        "connections": [{"node_id": "n1", "pin_id": "GND"}],
+                    }
+                ],
+            }
+        )
+        state = ProjectState.model_validate_json(raw)
+        assert state.project_id == "json_test"
+        assert state.nets[0].net_type == NetType.GND
+
+
+class TestExampleFixtures:
+    def test_example_manifests_validate(self):
+        for path in REPO_ROOT.glob("hardware_library/manifests/*.example.json"):
+            ComponentManifest.model_validate_json(path.read_text())
+
+    def test_example_project_state_validates(self):
+        path = REPO_ROOT / "projects" / "demo_robot.example.json"
+        ProjectState.model_validate_json(path.read_text())
+
+    def test_all_component_types_accepted(self):
+        for comp_type in ComponentType:
+            manifest = ComponentManifest(
+                component_id=f"type_{comp_type.value.lower()}",
+                name="Type Test",
+                type=comp_type,
+                power_requirements=PowerRequirements(
+                    min_operating_voltage=3.0,
+                    max_operating_voltage=3.3,
+                    logic_level_voltage=3.3,
+                    max_current_draw_ma=1.0,
+                ),
+                pins=[Pin(pin_id="GND", pin_type=PinType.GND)],
+            )
+            assert manifest.type == comp_type
+
+    def test_all_pin_types_accepted(self):
+        for pin_type in PinType:
+            pin = Pin(pin_id=f"pin_{pin_type.value}", pin_type=pin_type)
+            assert pin.pin_type == pin_type

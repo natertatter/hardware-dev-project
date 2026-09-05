@@ -1,0 +1,51 @@
+{
+  "component_id": "mcu_rp2040",
+  "name": "RP2040 Microcontroller",
+  "type": "MCU",
+  "power_requirements": {
+    "min_operating_voltage": 1.8,
+    "max_operating_voltage": 3.3,
+    "logic_level_voltage": 3.3,
+    "max_current_draw_ma": 500.0
+  },
+  "pins": [
+    {
+      "pin_id": "GPIO4",
+      "pin_type": "I2C_SDA",
+      "supported_features": ["I2C"],
+      "max_current_source_ma": 12.0,
+      "internal_pullup_enabled": false,
+      "active_state": "NONE"
+    },
+    {
+      "pin_id": "GPIO5",
+      "pin_type": "I2C_SCL",
+      "supported_features": ["I2C"],
+      "max_current_source_ma": 12.0,
+      "internal_pullup_enabled": false,
+      "active_state": "NONE"
+    },
+    {
+      "pin_id": "GPIO12",
+      "pin_type": "GPIO_OUT",
+      "supported_features": ["PWM"],
+      "max_current_source_ma": 12.0,
+      "internal_pullup_enabled": false,
+      "active_state": "NONE"
+    },
+    {
+      "pin_id": "VCC",
+      "pin_type": "POWER",
+      "supported_features": [],
+      "internal_pullup_enabled": false,
+      "active_state": "NONE"
+    },
+    {
+      "pin_id": "GND",
+      "pin_type": "GND",
+      "supported_features": [],
+      "internal_pullup_enabled": false,
+      "active_state": "NONE"
+    }
+  ]
+}

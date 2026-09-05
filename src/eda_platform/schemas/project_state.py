@@ -1,6 +1,6 @@
 """Pydantic models for the ProjectState schema (Systems Architect output)."""
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from eda_platform.schemas.enums import NetType
 
@@ -63,3 +63,14 @@ class ProjectState(BaseModel):
         if len(ids) != len(set(ids)):
             raise ValueError("net_id values must be unique within a project")
         return nets
+
+    @model_validator(mode="after")
+    def connections_reference_existing_nodes(self) -> "ProjectState":
+        node_ids = {node.node_id for node in self.nodes}
+        for net in self.nets:
+            for conn in net.connections:
+                if conn.node_id not in node_ids:
+                    raise ValueError(
+                        f"net '{net.net_id}' references unknown node_id '{conn.node_id}'"
+                    )
+        return self
