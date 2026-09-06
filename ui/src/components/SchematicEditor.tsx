@@ -52,19 +52,17 @@ function SchematicCanvas() {
   );
 
   return (
-    <div className="flex h-screen w-full flex-col bg-slate-950 text-slate-100">
-      <header className="flex items-center justify-between border-b border-slate-800 px-4 py-3">
+    <div className="editor-shell">
+      <header className="editor-shell__toolbar">
         <div>
-          <h1 className="text-lg font-semibold">EDA Platform — Schematic Editor</h1>
-          <p className="text-xs text-slate-400">
-            Drag components, wire pins, validate against the Logic Checker API.
-          </p>
+          <h1>EDA Platform — Schematic Editor</h1>
+          <p>Drag components, wire pins, validate against the Logic Checker API.</p>
         </div>
-        <div className="flex gap-2">
+        <div className="editor-shell__actions">
           <button
             type="button"
             onClick={() => actions.autoWire()}
-            className="rounded-md border border-slate-600 px-3 py-1.5 text-sm hover:bg-slate-800"
+            className="editor-shell__btn"
           >
             Auto-Wire (I2C)
           </button>
@@ -72,7 +70,7 @@ function SchematicCanvas() {
             type="button"
             onClick={() => actions.validateArchitecture()}
             disabled={validationStatus === "validating"}
-            className="rounded-md bg-emerald-600 px-3 py-1.5 text-sm font-medium hover:bg-emerald-500 disabled:opacity-50"
+            className="editor-shell__btn editor-shell__btn--validate"
           >
             {validationStatus === "validating" ? "Validating…" : "Validate Architecture"}
           </button>
@@ -80,7 +78,7 @@ function SchematicCanvas() {
             type="button"
             onClick={() => actions.approveSchematic()}
             disabled={validationStatus !== "pass" || schematicApproved}
-            className="rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium hover:bg-blue-500 disabled:opacity-50"
+            className="editor-shell__btn editor-shell__btn--approve"
           >
             {schematicApproved ? "Schematic Approved" : "Approve Schematic"}
           </button>
@@ -92,41 +90,43 @@ function SchematicCanvas() {
               validationStatus !== "pass" ||
               firmwareStatus === "generating"
             }
-            className="rounded-md bg-violet-600 px-3 py-1.5 text-sm font-medium hover:bg-violet-500 disabled:opacity-50"
+            className="editor-shell__btn editor-shell__btn--firmware"
           >
             {firmwareStatus === "generating" ? "Generating…" : "Generate Firmware"}
           </button>
         </div>
       </header>
 
-      <div className="flex flex-1 overflow-hidden">
-        <aside className="w-56 shrink-0 overflow-y-auto border-r border-slate-800 p-3">
-          <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
-            Component Catalog
-          </h2>
+      <div className="editor-shell__body">
+        <aside className="schematic-editor__sidebar">
+          <h2 className="schematic-editor__title">Component Catalog</h2>
+          <p className="schematic-editor__hint">
+            Click a part to place it on the canvas. Drag nodes to reposition them.
+          </p>
           {!catalogLoaded && !catalogError ? (
-            <p className="text-xs text-slate-500">Loading manifests…</p>
+            <p className="schematic-editor__hint">Loading manifests…</p>
           ) : catalogError ? (
-            <div className="space-y-2">
-              <p className="text-xs text-red-400">{catalogError}</p>
+            <>
+              <p className="editor-shell__status editor-shell__status--fail">{catalogError}</p>
               <button
                 type="button"
                 onClick={() => actions.loadCatalog()}
-                className="w-full rounded border border-slate-600 px-2 py-1.5 text-sm hover:bg-slate-900"
+                className="schematic-editor__catalog-btn"
               >
                 Retry
               </button>
-            </div>
+            </>
           ) : (
-            <ul className="space-y-2">
+            <ul className="schematic-editor__catalog">
               {catalog.map((entry) => (
                 <li key={entry.manifest.component_id}>
                   <button
                     type="button"
                     onClick={() => actions.addNodeFromCatalog(entry)}
-                    className="w-full rounded border border-slate-700 px-2 py-1.5 text-left text-sm hover:border-slate-500 hover:bg-slate-900"
+                    className="schematic-editor__catalog-btn"
                   >
-                    {entry.label}
+                    <span className="schematic-editor__catalog-type">{entry.manifest.type}</span>
+                    <span className="schematic-editor__catalog-name">{entry.label}</span>
                   </button>
                 </li>
               ))}
@@ -134,7 +134,7 @@ function SchematicCanvas() {
           )}
         </aside>
 
-        <main className="relative flex-1">
+        <main className="schematic-editor__canvas">
           <ReactFlow
             nodes={nodes}
             edges={edges}
@@ -143,7 +143,6 @@ function SchematicCanvas() {
             onConnect={onConnect}
             nodeTypes={nodeTypes}
             fitView
-            className="bg-slate-950"
           >
             <Background gap={16} color="#334155" />
             <Controls />
@@ -151,7 +150,7 @@ function SchematicCanvas() {
           </ReactFlow>
         </main>
 
-        <aside className="w-72 shrink-0 overflow-y-auto border-l border-slate-800 p-3">
+        <aside className="editor-shell__panel">
           <ValidationPanel
             status={validationStatus}
             issues={validationIssues}
