@@ -2,6 +2,7 @@
 
 import {
   Background,
+  ConnectionMode,
   Controls,
   MiniMap,
   ReactFlow,
@@ -16,6 +17,10 @@ import { useSchematicStore } from "@/store/useSchematicStore";
 import "@xyflow/react/dist/style.css";
 
 const nodeTypes = { hardware: HardwareNode };
+
+const defaultEdgeOptions = {
+  style: { stroke: "#60a5fa", strokeWidth: 2 },
+};
 
 function SchematicCanvas() {
   const nodes = useSchematicStore((s) => s.nodes);
@@ -142,6 +147,8 @@ function SchematicCanvas() {
             onEdgesChange={onEdgesChange}
             onConnect={onConnect}
             nodeTypes={nodeTypes}
+            connectionMode={ConnectionMode.Loose}
+            defaultEdgeOptions={defaultEdgeOptions}
             fitView
           >
             <Background gap={16} color="#334155" />
