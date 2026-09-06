@@ -46,7 +46,18 @@ REM ── Start API in background (same window) ──────────�
 echo [API]  http://localhost:8000  (logging to .eda-api.log)
 start /b "" %PYTHON% -m uvicorn eda_platform.api.main:app --reload --port 8000 > ".eda-api.log" 2>&1
 
-timeout /t 3 /nobreak >nul
+echo [API]  Waiting for health check...
+set /a _api_wait=0
+:wait_api
+%PYTHON% -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=1)" >nul 2>&1 && goto :api_ready
+set /a _api_wait+=1
+if %_api_wait% GEQ 20 (
+  echo [WARN] API did not respond after 20s. UI will use the built-in parts library.
+  goto :api_ready
+)
+timeout /t 1 /nobreak >nul
+goto :wait_api
+:api_ready
 
 REM ── Open browser, then run UI in foreground ────────────────────────────
 echo [UI]   http://localhost:3000

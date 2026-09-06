@@ -221,6 +221,17 @@ body {
   line-height: 1.55;
 }
 
+.schematic-editor__offline-note {
+  margin: 0;
+  padding: 0.5rem 0.625rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(247, 184, 1, 0.35);
+  background: rgba(247, 184, 1, 0.1);
+  font-size: 0.6875rem;
+  line-height: 1.45;
+  color: var(--pop-yellow);
+}
+
 .schematic-editor__catalog {
   list-style: none;
   margin: 0;
@@ -267,13 +278,17 @@ body {
 .schematic-editor__canvas {
   flex: 1;
   min-width: 0;
+  min-height: 0;
   position: relative;
+  display: flex;
+  flex-direction: column;
   background: var(--lab-bg);
 }
 
 .schematic-editor__canvas .react-flow {
+  flex: 1;
   width: 100%;
-  height: 100%;
+  min-height: 0;
 }
 
 .canvas-empty {
