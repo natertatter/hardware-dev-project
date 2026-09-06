@@ -105,7 +105,7 @@ function HardwareNodeComponent({
   const rightPins = manifest.pins.filter((p) => !isLeftSidePin(p));
 
   return (
-    <div className="hardware-node">
+    <div className={`hardware-node hardware-node--${manifest.type.toLowerCase()}`}>
       <header className="hardware-node__header">
         <span className="hardware-node__type">{manifest.type}</span>
         <strong className="hardware-node__name">{manifest.name}</strong>

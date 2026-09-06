@@ -17,35 +17,59 @@ interface ValidationPanelProps {
   firmwareMessage: string | null;
 }
 
-function validationStatusClass(status: ValidationStatus): string {
-  if (status === "validating") return "editor-shell__status--pending";
-  if (status === "pass") return "editor-shell__status--pass";
-  if (status === "fail") return "editor-shell__status--fail";
-  if (status === "error") return "editor-shell__status--error";
-  return "editor-shell__status--idle";
+function statusPillClass(kind: "idle" | "pending" | "pass" | "fail" | "error"): string {
+  return `status-pill status-pill--${kind}`;
 }
 
-function autoWireStatusClass(status: AutoWireStatus): string {
-  if (status === "wiring") return "editor-shell__status--pending";
-  if (status === "success") return "editor-shell__status--pass";
-  if (status === "error") return "editor-shell__status--fail";
-  return "editor-shell__status--idle";
+function validationPill(status: ValidationStatus): { className: string; label: string } {
+  const labels: Record<ValidationStatus, string> = {
+    idle: "Not validated",
+    validating: "Validating…",
+    pass: "Passed",
+    fail: "Failed",
+    error: "Error",
+  };
+  const kinds: Record<ValidationStatus, "idle" | "pending" | "pass" | "fail" | "error"> = {
+    idle: "idle",
+    validating: "pending",
+    pass: "pass",
+    fail: "fail",
+    error: "error",
+  };
+  return { className: statusPillClass(kinds[status]), label: labels[status] };
 }
 
-function firmwareStatusClass(status: FirmwareStatus): string {
-  if (status === "generating") return "editor-shell__status--pending";
-  if (status === "success") return "editor-shell__status--pass";
-  if (status === "error") return "editor-shell__status--fail";
-  return "editor-shell__status--idle";
+function autoWirePill(status: AutoWireStatus): { className: string; label: string } {
+  const labels: Record<AutoWireStatus, string> = {
+    idle: "Not run",
+    wiring: "Wiring…",
+    success: "Wired",
+    error: "Failed",
+  };
+  const kinds: Record<AutoWireStatus, "idle" | "pending" | "pass" | "fail"> = {
+    idle: "idle",
+    wiring: "pending",
+    success: "pass",
+    error: "fail",
+  };
+  return { className: statusPillClass(kinds[status]), label: labels[status] };
 }
 
-const STATUS_LABELS: Record<ValidationStatus, string> = {
-  idle: "Not validated",
-  validating: "Validating…",
-  pass: "Passed",
-  fail: "Failed",
-  error: "Error",
-};
+function firmwarePill(status: FirmwareStatus): { className: string; label: string } {
+  const labels: Record<FirmwareStatus, string> = {
+    idle: "Not generated",
+    generating: "Generating…",
+    success: "Generated",
+    error: "Failed",
+  };
+  const kinds: Record<FirmwareStatus, "idle" | "pending" | "pass" | "fail"> = {
+    idle: "idle",
+    generating: "pending",
+    success: "pass",
+    error: "fail",
+  };
+  return { className: statusPillClass(kinds[status]), label: labels[status] };
+}
 
 export function ValidationPanel({
   status,
@@ -58,58 +82,60 @@ export function ValidationPanel({
   firmwareOutputDir,
   firmwareMessage,
 }: ValidationPanelProps) {
+  const validation = validationPill(status);
+  const autoWire = autoWirePill(autoWireStatus);
+  const firmware = firmwarePill(firmwareStatus);
+
   return (
-    <div>
-      <h2 className="editor-shell__panel-title">Validation</h2>
-      <p className={`editor-shell__status ${validationStatusClass(status)}`}>
-        {STATUS_LABELS[status]}
-      </p>
-      {message && <p className="editor-shell__note">{message}</p>}
-      {schematicApproved && (
-        <p className="editor-shell__banner editor-shell__banner--info">
-          Schematic approved — you can generate firmware for Raspberry Pi 4.
-        </p>
-      )}
-      {status === "fail" && issues.length > 0 && (
-        <ul className="editor-shell__issue-list">
-          {issues.map((issue, i) => (
-            <li key={`${issue.rule}-${i}`} className="editor-shell__issue">
-              <span className="editor-shell__issue-rule">{issue.rule}</span>
-              <p className="editor-shell__note">{issue.message}</p>
-              {(issue.node_id || issue.net_id) && (
-                <p className="editor-shell__issue-meta">
-                  {issue.node_id && `node: ${issue.node_id}`}
-                  {issue.node_id && issue.net_id && " · "}
-                  {issue.net_id && `net: ${issue.net_id}`}
-                </p>
-              )}
-            </li>
-          ))}
-        </ul>
-      )}
+    <>
+      <div className="panel-card">
+        <div className="panel-card__header">
+          <h2 className="panel-card__title">Validation</h2>
+          <span className={validation.className}>{validation.label}</span>
+        </div>
+        {message && <p className="panel-card__message">{message}</p>}
+        {schematicApproved && (
+          <p className="editor-shell__banner editor-shell__banner--info">
+            Schematic approved — ready to generate Pi 4 firmware.
+          </p>
+        )}
+        {status === "fail" && issues.length > 0 && (
+          <ul className="editor-shell__issue-list">
+            {issues.map((issue, i) => (
+              <li key={`${issue.rule}-${i}`} className="editor-shell__issue">
+                <span className="editor-shell__issue-rule">{issue.rule}</span>
+                <p className="panel-card__message">{issue.message}</p>
+                {(issue.node_id || issue.net_id) && (
+                  <p className="editor-shell__issue-meta">
+                    {issue.node_id && `node: ${issue.node_id}`}
+                    {issue.node_id && issue.net_id && " · "}
+                    {issue.net_id && `net: ${issue.net_id}`}
+                  </p>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
 
-      <h2 className="editor-shell__panel-title editor-shell__panel-title--spaced">Auto-Wire</h2>
-      <p className={`editor-shell__status ${autoWireStatusClass(autoWireStatus)}`}>
-        {autoWireStatus === "idle" && "Not run"}
-        {autoWireStatus === "wiring" && "Wiring…"}
-        {autoWireStatus === "success" && "Wired"}
-        {autoWireStatus === "error" && "Failed"}
-      </p>
-      {autoWireMessage && <p className="editor-shell__note">{autoWireMessage}</p>}
+      <div className="panel-card">
+        <div className="panel-card__header">
+          <h2 className="panel-card__title">Auto-Wire</h2>
+          <span className={autoWire.className}>{autoWire.label}</span>
+        </div>
+        {autoWireMessage && <p className="panel-card__message">{autoWireMessage}</p>}
+      </div>
 
-      <h2 className="editor-shell__panel-title editor-shell__panel-title--spaced">
-        Firmware (Pi 4)
-      </h2>
-      <p className={`editor-shell__status ${firmwareStatusClass(firmwareStatus)}`}>
-        {firmwareStatus === "idle" && "Not generated"}
-        {firmwareStatus === "generating" && "Generating…"}
-        {firmwareStatus === "success" && "Generated"}
-        {firmwareStatus === "error" && "Generation failed"}
-      </p>
-      {firmwareMessage && <p className="editor-shell__note">{firmwareMessage}</p>}
-      {firmwareOutputDir && (
-        <p className="editor-shell__banner editor-shell__banner--output">{firmwareOutputDir}</p>
-      )}
-    </div>
+      <div className="panel-card">
+        <div className="panel-card__header">
+          <h2 className="panel-card__title">Firmware</h2>
+          <span className={firmware.className}>{firmware.label}</span>
+        </div>
+        {firmwareMessage && <p className="panel-card__message">{firmwareMessage}</p>}
+        {firmwareOutputDir && (
+          <p className="editor-shell__banner editor-shell__banner--output">{firmwareOutputDir}</p>
+        )}
+      </div>
+    </>
   );
 }
