@@ -19,7 +19,7 @@ import "@xyflow/react/dist/style.css";
 const nodeTypes = { hardware: HardwareNode };
 
 const defaultEdgeOptions = {
-  style: { stroke: "#60a5fa", strokeWidth: 2 },
+  style: { stroke: "#22d3ee", strokeWidth: 2 },
 };
 
 function SchematicCanvas() {
@@ -59,9 +59,12 @@ function SchematicCanvas() {
   return (
     <div className="editor-shell">
       <header className="editor-shell__toolbar">
-        <div>
-          <h1>EDA Platform — Schematic Editor</h1>
-          <p>Drag components, wire pins, validate against the Logic Checker API.</p>
+        <div className="editor-shell__brand">
+          <div className="editor-shell__logo" aria-hidden="true">⬡</div>
+          <div>
+            <h1>EDA Platform</h1>
+            <p className="editor-shell__tagline">Design · Validate · Generate</p>
+          </div>
         </div>
         <div className="editor-shell__actions">
           <button
@@ -77,7 +80,7 @@ function SchematicCanvas() {
             disabled={validationStatus === "validating"}
             className="editor-shell__btn editor-shell__btn--validate"
           >
-            {validationStatus === "validating" ? "Validating…" : "Validate Architecture"}
+            {validationStatus === "validating" ? "Validating…" : "Validate"}
           </button>
           <button
             type="button"
@@ -85,7 +88,7 @@ function SchematicCanvas() {
             disabled={validationStatus !== "pass" || schematicApproved}
             className="editor-shell__btn editor-shell__btn--approve"
           >
-            {schematicApproved ? "Schematic Approved" : "Approve Schematic"}
+            {schematicApproved ? "Approved ✓" : "Approve"}
           </button>
           <button
             type="button"
@@ -104,15 +107,17 @@ function SchematicCanvas() {
 
       <div className="editor-shell__body">
         <aside className="schematic-editor__sidebar">
-          <h2 className="schematic-editor__title">Component Catalog</h2>
+          <h2 className="schematic-editor__title">Parts Library</h2>
           <p className="schematic-editor__hint">
-            Click a part to place it on the canvas. Drag nodes to reposition them.
+            Click a component to place it on the canvas. Drag to reposition, connect pin to pin.
           </p>
           {!catalogLoaded && !catalogError ? (
-            <p className="schematic-editor__hint">Loading manifests…</p>
+            <p className="schematic-editor__hint">Loading catalog…</p>
           ) : catalogError ? (
             <>
-              <p className="editor-shell__status editor-shell__status--fail">{catalogError}</p>
+              <p className="panel-card__message" style={{ color: "var(--accent-rose)" }}>
+                {catalogError}
+              </p>
               <button
                 type="button"
                 onClick={() => actions.loadCatalog()}
@@ -140,6 +145,15 @@ function SchematicCanvas() {
         </aside>
 
         <main className="schematic-editor__canvas">
+          {nodes.length === 0 && (
+            <div className="canvas-empty">
+              <div className="canvas-empty__icon" aria-hidden="true">⬡</div>
+              <p className="canvas-empty__title">Your schematic starts here</p>
+              <p className="canvas-empty__text">
+                Pick a part from the library, wire the pins, then validate and generate firmware for your Raspberry Pi.
+              </p>
+            </div>
+          )}
           <ReactFlow
             nodes={nodes}
             edges={edges}
@@ -151,9 +165,13 @@ function SchematicCanvas() {
             defaultEdgeOptions={defaultEdgeOptions}
             fitView
           >
-            <Background gap={16} color="#334155" />
+            <Background gap={20} color="rgba(34, 211, 238, 0.06)" />
             <Controls />
-            <MiniMap nodeColor="#1e293b" maskColor="rgba(15,23,42,0.8)" />
+            <MiniMap
+              nodeColor="#1a2236"
+              maskColor="rgba(6, 8, 15, 0.85)"
+              style={{ borderRadius: 8 }}
+            />
           </ReactFlow>
         </main>
 
