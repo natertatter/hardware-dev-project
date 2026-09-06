@@ -1,83 +1,86 @@
 @echo off
 setlocal EnableExtensions
 
-REM ── EDA Platform one-click launcher (Windows) ──────────────────────────
-REM Double-click this file to start the API + UI dev servers.
-REM Two terminal windows will open (one for each). Close them to stop.
+REM ── EDA Platform launcher (Windows) ────────────────────────────────────
+REM   Double-click          → starts API + UI in this one window
+REM   start-eda-platform stop → kills servers on ports 8000 and 3000
 
 cd /d "%~dp0"
 
+if /i "%~1"=="stop" goto :stop
+
+title EDA Platform
+
 echo.
-echo  EDA Platform - Starting...
-echo  Project: %CD%
+echo  ╔══════════════════════════════════════╗
+echo  ║         EDA Platform                 ║
+echo  ╚══════════════════════════════════════╝
 echo.
 
-REM ── Find Python ────────────────────────────────────────────────────────
+REM ── Prerequisites ──────────────────────────────────────────────────────
 set "PYTHON=python"
 where python >nul 2>&1 || set "PYTHON=py"
 where %PYTHON% >nul 2>&1 || (
   echo [ERROR] Python not found. Install from https://www.python.org/downloads/
-  echo         Check "Add python.exe to PATH" during install.
   pause
   exit /b 1
 )
-
-REM ── Find Node.js ─────────────────────────────────────────────────────────
 where node >nul 2>&1 || (
   echo [ERROR] Node.js not found. Install LTS from https://nodejs.org/
   pause
   exit /b 1
 )
 
-REM ── Install backend deps if needed ───────────────────────────────────────
+REM ── First-run setup ────────────────────────────────────────────────────
 %PYTHON% -c "import eda_platform" >nul 2>&1
 if errorlevel 1 (
-  echo [SETUP] Installing Python dependencies (first run only)...
-  %PYTHON% -m pip install -e ".[dev]"
-  if errorlevel 1 (
-    echo [ERROR] pip install failed.
-    pause
-    exit /b 1
-  )
+  echo [SETUP] Installing Python dependencies...
+  %PYTHON% -m pip install -e ".[dev]" || (echo [ERROR] pip install failed. & pause & exit /b 1)
 )
-
-REM ── Install UI deps if needed ────────────────────────────────────────────
 if not exist "ui\node_modules\" (
-  echo [SETUP] Installing UI dependencies (first run only)...
-  pushd ui
-  call npm install
-  if errorlevel 1 (
-    echo [ERROR] npm install failed.
-    popd
-    pause
-    exit /b 1
-  )
-  popd
+  echo [SETUP] Installing UI dependencies...
+  pushd ui && call npm install && popd || (echo [ERROR] npm install failed. & pause & exit /b 1)
 )
 
-REM ── Start API server (new window) ────────────────────────────────────────
-echo [START] API server on http://localhost:8000
-start "EDA Platform - API" cmd /k "cd /d "%CD%" && %PYTHON% -m uvicorn eda_platform.api.main:app --reload --port 8000"
+REM ── Start API in background (same window) ────────────────────────────────
+echo [API]  http://localhost:8000  (logging to .eda-api.log)
+start /b "" %PYTHON% -m uvicorn eda_platform.api.main:app --reload --port 8000 > ".eda-api.log" 2>&1
 
-REM Give the API a moment to bind before the UI loads the catalog
 timeout /t 3 /nobreak >nul
 
-REM ── Start UI dev server (new window) ─────────────────────────────────────
-echo [START] UI on http://localhost:3000
-start "EDA Platform - UI" cmd /k "cd /d "%CD%\ui" && set NEXT_PUBLIC_API_URL=http://localhost:8000 && npm run dev"
+REM ── Open browser, then run UI in foreground ────────────────────────────
+echo [UI]   http://localhost:3000
+echo.
+echo  Press Ctrl+C to stop. If the API keeps running, use: start-eda-platform.bat stop
+echo.
 
-REM ── Open browser ─────────────────────────────────────────────────────────
-timeout /t 5 /nobreak >nul
 start "" "http://localhost:3000"
 
+pushd ui
+set NEXT_PUBLIC_API_URL=http://localhost:8000
+call npm run dev
+popd
+
+call :cleanup
 echo.
-echo  Done! Two windows opened:
-echo    - EDA Platform - API
-echo    - EDA Platform - UI
-echo.
-echo  Browser: http://localhost:3000
-echo  API health: http://localhost:8000/health
-echo.
-echo  Close both terminal windows to stop the app.
-echo.
+echo  Stopped.
 pause
+exit /b 0
+
+REM ── Stop command ─────────────────────────────────────────────────────────
+:stop
+echo Stopping servers on ports 8000 and 3000...
+call :cleanup
+echo Done.
+pause
+exit /b 0
+
+REM ── Kill processes bound to API/UI ports ─────────────────────────────────
+:cleanup
+for /f "tokens=5" %%a in ('netstat -ano 2^>nul ^| findstr ":8000" ^| findstr "LISTENING"') do (
+  taskkill /PID %%a /F >nul 2>&1
+)
+for /f "tokens=5" %%a in ('netstat -ano 2^>nul ^| findstr ":3000" ^| findstr "LISTENING"') do (
+  taskkill /PID %%a /F >nul 2>&1
+)
+exit /b 0
