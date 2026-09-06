@@ -95,7 +95,7 @@ export function ValidationPanel({
         </div>
         {message && <p className="panel-card__message">{message}</p>}
         {schematicApproved && (
-          <p className="editor-shell__banner editor-shell__banner--info">
+          <p className="editor-shell__banner editor-shell__banner--verified">
             Schematic approved — ready to generate Pi 4 firmware.
           </p>
         )}
