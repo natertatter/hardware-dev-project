@@ -1,0 +1,13 @@
+{
+  "platform_id": "rpi4",
+  "name": "Raspberry Pi 4",
+  "i2c_device_path": "/dev/i2c-1",
+  "i2c_bus_number": 1,
+  "logical_pin_map": {
+    "GPIO4": 2,
+    "GPIO5": 3,
+    "I2C_SDA": 2,
+    "I2C_SCL": 3
+  },
+  "notes": "Enable I2C via raspi-config. Default bus maps schematic RP2040 GPIO4/5 to Pi header I2C1."
+}
