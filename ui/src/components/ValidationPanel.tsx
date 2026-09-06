@@ -17,34 +17,34 @@ interface ValidationPanelProps {
   firmwareMessage: string | null;
 }
 
+function validationStatusClass(status: ValidationStatus): string {
+  if (status === "validating") return "editor-shell__status--pending";
+  if (status === "pass") return "editor-shell__status--pass";
+  if (status === "fail") return "editor-shell__status--fail";
+  if (status === "error") return "editor-shell__status--error";
+  return "editor-shell__status--idle";
+}
+
+function autoWireStatusClass(status: AutoWireStatus): string {
+  if (status === "wiring") return "editor-shell__status--pending";
+  if (status === "success") return "editor-shell__status--pass";
+  if (status === "error") return "editor-shell__status--fail";
+  return "editor-shell__status--idle";
+}
+
+function firmwareStatusClass(status: FirmwareStatus): string {
+  if (status === "generating") return "editor-shell__status--pending";
+  if (status === "success") return "editor-shell__status--pass";
+  if (status === "error") return "editor-shell__status--fail";
+  return "editor-shell__status--idle";
+}
+
 const STATUS_LABELS: Record<ValidationStatus, string> = {
   idle: "Not validated",
   validating: "Validating…",
   pass: "Passed",
   fail: "Failed",
   error: "Error",
-};
-
-const STATUS_COLORS: Record<ValidationStatus, string> = {
-  idle: "text-slate-400",
-  validating: "text-amber-400",
-  pass: "text-emerald-400",
-  fail: "text-red-400",
-  error: "text-orange-400",
-};
-
-const AUTO_WIRE_COLORS: Record<AutoWireStatus, string> = {
-  idle: "text-slate-400",
-  wiring: "text-amber-400",
-  success: "text-emerald-400",
-  error: "text-red-400",
-};
-
-const FIRMWARE_COLORS: Record<FirmwareStatus, string> = {
-  idle: "text-slate-400",
-  generating: "text-amber-400",
-  success: "text-emerald-400",
-  error: "text-red-400",
 };
 
 export function ValidationPanel({
@@ -59,30 +59,25 @@ export function ValidationPanel({
   firmwareMessage,
 }: ValidationPanelProps) {
   return (
-    <div className="space-y-3">
-      <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-        Validation
-      </h2>
-      <p className={`text-sm font-medium ${STATUS_COLORS[status]}`}>
+    <div>
+      <h2 className="editor-shell__panel-title">Validation</h2>
+      <p className={`editor-shell__status ${validationStatusClass(status)}`}>
         {STATUS_LABELS[status]}
       </p>
-      {message && <p className="text-xs text-slate-400">{message}</p>}
+      {message && <p className="editor-shell__note">{message}</p>}
       {schematicApproved && (
-        <p className="rounded border border-blue-700 bg-blue-950/50 px-2 py-1 text-xs text-blue-300">
+        <p className="editor-shell__banner editor-shell__banner--info">
           Schematic approved — you can generate firmware for Raspberry Pi 4.
         </p>
       )}
       {status === "fail" && issues.length > 0 && (
-        <ul className="space-y-2">
+        <ul className="editor-shell__issue-list">
           {issues.map((issue, i) => (
-            <li
-              key={`${issue.rule}-${i}`}
-              className="rounded border border-red-900/60 bg-red-950/30 px-2 py-1.5 text-xs"
-            >
-              <span className="font-mono text-red-300">{issue.rule}</span>
-              <p className="mt-0.5 text-slate-300">{issue.message}</p>
+            <li key={`${issue.rule}-${i}`} className="editor-shell__issue">
+              <span className="editor-shell__issue-rule">{issue.rule}</span>
+              <p className="editor-shell__note">{issue.message}</p>
               {(issue.node_id || issue.net_id) && (
-                <p className="mt-0.5 text-slate-500">
+                <p className="editor-shell__issue-meta">
                   {issue.node_id && `node: ${issue.node_id}`}
                   {issue.node_id && issue.net_id && " · "}
                   {issue.net_id && `net: ${issue.net_id}`}
@@ -93,31 +88,27 @@ export function ValidationPanel({
         </ul>
       )}
 
-      <h2 className="pt-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
-        Auto-Wire
-      </h2>
-      <p className={`text-sm font-medium ${AUTO_WIRE_COLORS[autoWireStatus]}`}>
+      <h2 className="editor-shell__panel-title editor-shell__panel-title--spaced">Auto-Wire</h2>
+      <p className={`editor-shell__status ${autoWireStatusClass(autoWireStatus)}`}>
         {autoWireStatus === "idle" && "Not run"}
         {autoWireStatus === "wiring" && "Wiring…"}
         {autoWireStatus === "success" && "Wired"}
         {autoWireStatus === "error" && "Failed"}
       </p>
-      {autoWireMessage && <p className="text-xs text-slate-400">{autoWireMessage}</p>}
+      {autoWireMessage && <p className="editor-shell__note">{autoWireMessage}</p>}
 
-      <h2 className="pt-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
+      <h2 className="editor-shell__panel-title editor-shell__panel-title--spaced">
         Firmware (Pi 4)
       </h2>
-      <p className={`text-sm font-medium ${FIRMWARE_COLORS[firmwareStatus]}`}>
+      <p className={`editor-shell__status ${firmwareStatusClass(firmwareStatus)}`}>
         {firmwareStatus === "idle" && "Not generated"}
         {firmwareStatus === "generating" && "Generating…"}
         {firmwareStatus === "success" && "Generated"}
         {firmwareStatus === "error" && "Generation failed"}
       </p>
-      {firmwareMessage && <p className="text-xs text-slate-400">{firmwareMessage}</p>}
+      {firmwareMessage && <p className="editor-shell__note">{firmwareMessage}</p>}
       {firmwareOutputDir && (
-        <p className="rounded border border-violet-800 bg-violet-950/40 px-2 py-1 font-mono text-xs text-violet-200">
-          {firmwareOutputDir}
-        </p>
+        <p className="editor-shell__banner editor-shell__banner--output">{firmwareOutputDir}</p>
       )}
     </div>
   );
