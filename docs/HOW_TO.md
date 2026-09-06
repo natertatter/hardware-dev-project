@@ -32,6 +32,8 @@ cd ui && npm install
 NEXT_PUBLIC_API_URL=http://localhost:8000 npm run dev
 ```
 
+**Windows one-click:** double-click `start-eda-platform.bat` in the project root (opens API + UI automatically). Use `stop-eda-platform.bat` if ports stay busy after closing.
+
 ---
 
 ## UI Workflow
