@@ -57,15 +57,34 @@ interface SchematicState {
 
 let nodeCounter = 0;
 
-function resetWorkflowState() {
+function resetApprovalAndFirmware() {
   return {
     schematicApproved: false,
     firmwareStatus: "idle" as FirmwareStatus,
     firmwareOutputDir: null,
     firmwareMessage: null,
+  };
+}
+
+function resetWorkflowState() {
+  return {
+    ...resetApprovalAndFirmware(),
     autoWireStatus: "idle" as AutoWireStatus,
     autoWireMessage: null,
   };
+}
+
+function isUserDrivenNodeChange(changes: NodeChange<Node<HardwareNodeData>>[]): boolean {
+  return changes.some(
+    (change) =>
+      change.type === "remove" ||
+      change.type === "add" ||
+      (change.type === "position" && "dragging" in change && change.dragging === false),
+  );
+}
+
+function isUserDrivenEdgeChange(changes: EdgeChange[]): boolean {
+  return changes.some((change) => change.type === "remove");
 }
 
 function placementOnlyProjectState(
@@ -105,13 +124,13 @@ export const useSchematicStore = create<SchematicState>((set, get) => ({
     onNodesChange: (changes) => {
       set({
         nodes: applyNodeChanges(changes, get().nodes),
-        ...resetWorkflowState(),
+        ...(isUserDrivenNodeChange(changes) ? resetWorkflowState() : {}),
       });
     },
     onEdgesChange: (changes) => {
       set({
         edges: applyEdgeChanges(changes, get().edges),
-        ...resetWorkflowState(),
+        ...(isUserDrivenEdgeChange(changes) ? resetWorkflowState() : {}),
       });
     },
     onConnect: (connection) => {
@@ -240,7 +259,10 @@ export const useSchematicStore = create<SchematicState>((set, get) => ({
         set({
           nodes,
           edges,
-          ...resetWorkflowState(),
+          ...resetApprovalAndFirmware(),
+          validationStatus: "idle",
+          validationIssues: [],
+          validationMessage: null,
           autoWireStatus: "success",
           autoWireMessage: `Added ${response.wires_added} net(s).`,
         });

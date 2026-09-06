@@ -32,6 +32,8 @@ cd ui && npm install
 NEXT_PUBLIC_API_URL=http://localhost:8000 npm run dev
 ```
 
+**Windows one-click:** double-click `start-eda-platform.bat` (one window, API + UI). To stop stuck servers: `start-eda-platform.bat stop`
+
 ---
 
 ## UI Workflow
