@@ -2,6 +2,7 @@
 
 import {
   Background,
+  BackgroundVariant,
   ConnectionMode,
   Controls,
   MiniMap,
@@ -19,7 +20,8 @@ import "@xyflow/react/dist/style.css";
 const nodeTypes = { hardware: HardwareNode };
 
 const defaultEdgeOptions = {
-  style: { stroke: "#22d3ee", strokeWidth: 2 },
+  type: "smoothstep" as const,
+  style: { stroke: "var(--lab-border)", strokeWidth: 2 },
 };
 
 function SchematicCanvas() {
@@ -60,10 +62,10 @@ function SchematicCanvas() {
     <div className="editor-shell">
       <header className="editor-shell__toolbar">
         <div className="editor-shell__brand">
-          <div className="editor-shell__logo" aria-hidden="true">⬡</div>
+          <div className="editor-shell__logo" aria-hidden="true" />
           <div>
             <h1>EDA Platform</h1>
-            <p className="editor-shell__tagline">Design · Validate · Generate</p>
+            <p className="editor-shell__tagline">Industrial schematic lab</p>
           </div>
         </div>
         <div className="editor-shell__actions">
@@ -72,7 +74,7 @@ function SchematicCanvas() {
             onClick={() => actions.autoWire()}
             className="editor-shell__btn"
           >
-            Auto-Wire (I2C)
+            Auto-Wire
           </button>
           <button
             type="button"
@@ -80,7 +82,7 @@ function SchematicCanvas() {
             disabled={validationStatus === "validating"}
             className="editor-shell__btn editor-shell__btn--validate"
           >
-            {validationStatus === "validating" ? "Validating…" : "Validate"}
+            {validationStatus === "validating" ? "Validating…" : "Validate Architecture"}
           </button>
           <button
             type="button"
@@ -88,7 +90,7 @@ function SchematicCanvas() {
             disabled={validationStatus !== "pass" || schematicApproved}
             className="editor-shell__btn editor-shell__btn--approve"
           >
-            {schematicApproved ? "Approved ✓" : "Approve"}
+            {schematicApproved ? "Approved" : "Approve"}
           </button>
           <button
             type="button"
@@ -109,15 +111,13 @@ function SchematicCanvas() {
         <aside className="schematic-editor__sidebar">
           <h2 className="schematic-editor__title">Parts Library</h2>
           <p className="schematic-editor__hint">
-            Click a component to place it on the canvas. Drag to reposition, connect pin to pin.
+            Click a module to place it on the drafting table. Orthogonal traces only.
           </p>
           {!catalogLoaded && !catalogError ? (
             <p className="schematic-editor__hint">Loading catalog…</p>
           ) : catalogError ? (
             <>
-              <p className="panel-card__message" style={{ color: "var(--accent-rose)" }}>
-                {catalogError}
-              </p>
+              <p className="panel-card__message panel-card__message--error">{catalogError}</p>
               <button
                 type="button"
                 onClick={() => actions.loadCatalog()}
@@ -147,10 +147,10 @@ function SchematicCanvas() {
         <main className="schematic-editor__canvas">
           {nodes.length === 0 && (
             <div className="canvas-empty">
-              <div className="canvas-empty__icon" aria-hidden="true">⬡</div>
-              <p className="canvas-empty__title">Your schematic starts here</p>
+              <div className="canvas-empty__reticle" aria-hidden="true" />
+              <p className="canvas-empty__title">Drafting table ready</p>
               <p className="canvas-empty__text">
-                Pick a part from the library, wire the pins, then validate and generate firmware for your Raspberry Pi.
+                Place modules from the library. Wire pins with 90° traces, then validate and compile firmware.
               </p>
             </div>
           )}
@@ -163,14 +163,20 @@ function SchematicCanvas() {
             nodeTypes={nodeTypes}
             connectionMode={ConnectionMode.Loose}
             defaultEdgeOptions={defaultEdgeOptions}
+            connectionLineStyle={{ stroke: "var(--pop-blue)", strokeWidth: 2 }}
             fitView
           >
-            <Background gap={20} color="rgba(34, 211, 238, 0.06)" />
+            <Background
+              variant={BackgroundVariant.Dots}
+              gap={20}
+              size={1}
+              color="var(--lab-border)"
+            />
             <Controls />
             <MiniMap
-              nodeColor="#1a2236"
-              maskColor="rgba(6, 8, 15, 0.85)"
-              style={{ borderRadius: 8 }}
+              nodeColor="var(--lab-surface)"
+              maskColor="rgba(28, 30, 33, 0.92)"
+              className="schematic-minimap"
             />
           </ReactFlow>
         </main>

@@ -48,10 +48,12 @@ export function decompileProjectState(
       edgeCounter += 1;
       edges.push({
         id: `edge_${net.net_id}_${edgeCounter}`,
+        type: "smoothstep",
         source: a.node_id,
         sourceHandle: a.pin_id,
         target: b.node_id,
         targetHandle: b.pin_id,
+        style: { stroke: "var(--lab-border)", strokeWidth: 2 },
       });
     }
   }

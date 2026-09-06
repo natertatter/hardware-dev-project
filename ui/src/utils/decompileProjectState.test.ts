@@ -39,6 +39,7 @@ describe("decompileProjectState auto-wire", () => {
 
     expect(edges).toHaveLength(2);
     expect(edges[0]).toMatchObject({
+      type: "smoothstep",
       source: "node-mcu_rp2040-1",
       sourceHandle: "GPIO4",
       target: "node-sens_ina219-2",
