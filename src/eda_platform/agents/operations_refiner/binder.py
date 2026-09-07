@@ -12,13 +12,49 @@ from eda_platform.schemas import (
     ProjectState,
 )
 
+# Generic electronics/hardware terms that appear in many component names
+# (e.g. "INA219 Current/Power Monitor") but do not identify any specific
+# node. Matching on these alone causes false positives — e.g. a generic
+# "Enable power rail" boot step incorrectly binding to a current sensor
+# just because its manifest name happens to contain "Power". Excluded from
+# keyword matching entirely; a real match must come from the node_id
+# substring check or a genuinely distinguishing token (model number, etc.).
+_GENERIC_STOPWORDS = {
+    "power",
+    "current",
+    "voltage",
+    "monitor",
+    "module",
+    "board",
+    "circuit",
+    "system",
+    "controller",
+    "driver",
+    "device",
+    "unit",
+    "signal",
+    "output",
+    "input",
+    "sensor",
+    "actuator",
+    "component",
+}
+
+# Minimum accumulated score required to accept a fuzzy match. A single
+# generic-keyword hit (weight 2) must never be sufficient on its own —
+# only an exact node_id substring match (weight 3) or multiple corroborating
+# tokens should bind a step to a node. Ambiguous steps are left unbound and
+# surfaced as open questions instead (a false negative is safe; a false
+# positive silently corrupts the operations sequence and generated firmware).
+_MIN_MATCH_SCORE = 3
+
 
 def _node_keywords(node_id: str, component_id: str, manifest: ComponentManifest) -> set[str]:
     """Tokens usable for fuzzy matching step descriptions to nodes."""
     tokens: set[str] = set()
     for value in (node_id, component_id, manifest.name):
         for part in re.split(r"[_\s\-/]+", value.lower()):
-            if len(part) >= 3:
+            if len(part) >= 3 and part not in _GENERIC_STOPWORDS:
                 tokens.add(part)
     return tokens
 
@@ -47,7 +83,7 @@ def match_node_for_step(
             best_score = score
             best_id = node.node_id
 
-    return best_id if best_score > 0 else None
+    return best_id if best_score >= _MIN_MATCH_SCORE else None
 
 
 def classification_for_node(

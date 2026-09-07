@@ -57,3 +57,31 @@ class TestOperationsRefiner:
         result = refine_operations(seq, project, manifests)
         assert result.questions_added >= 1
         assert result.refined.steps[0].needs_refinement is True
+
+    def test_generic_manifest_word_does_not_cause_false_binding(self):
+        """Regression: 'Enable power rail' must not bind to sensor_1 just
+        because the INA219 manifest name contains the generic word 'Power'
+        ('INA219 Current/Power Monitor'). A single generic-keyword hit must
+        never be enough to bind a step to an unrelated node.
+        """
+        project = _valid_project_state()
+        manifests = mock_manifests()
+        seq = OperationsSequence(
+            project_id="valid_i2c_wiring",
+            fidelity=FidelityLevel.NARRATIVE,
+            narrative="Enable power rail and wait for settle.\nPoll sensor_1 current reading.",
+        )
+        result = refine_operations(seq, project, manifests)
+
+        boot_step = next(
+            s for s in result.refined.steps if "power rail" in s.description.lower()
+        )
+        assert boot_step.target_node_id is None, (
+            f"'Enable power rail' incorrectly bound to {boot_step.target_node_id!r} "
+            "via a generic keyword collision"
+        )
+
+        sensor_step = next(
+            s for s in result.refined.steps if "sensor_1" in s.description.lower()
+        )
+        assert sensor_step.target_node_id == "sensor_1"

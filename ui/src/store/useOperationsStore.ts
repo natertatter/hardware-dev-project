@@ -72,8 +72,19 @@ export const useOperationsStore = create<OperationsState>((set, get) => ({
   refineMessage: null,
   actions: {
     setNarrative: (text) => {
+      // Keep a still-narrative-only sequence (captured via a prior "Save
+      // Draft") in sync with live edits. Without this, refine() prefers
+      // `sequence` over the freshly typed `narrative` whenever a draft was
+      // saved earlier, so edits made after that point are silently dropped
+      // on the next Refine click. A sequence that has already progressed to
+      // bound steps (post-refine/merge) is left alone — the user is editing
+      // step-level data at that point, not narrative text.
+      const current = get().sequence;
+      const syncedSequence =
+        current && current.steps.length === 0 ? { ...current, narrative: text } : current;
       set({
         narrative: text,
+        sequence: syncedSequence,
         operationsApproved: false,
         refinedSequence: null,
         operationsStatus: "idle",
@@ -87,13 +98,25 @@ export const useOperationsStore = create<OperationsState>((set, get) => ({
         set({ operationsMessage: "Enter a narrative description first." });
         return;
       }
-      const projectState = schematicProjectState();
-      const draft: OperationsSequence = {
-        ...emptySequence(projectState.project_id),
-        narrative,
-      };
       try {
-        await saveOperationsDraft(projectState.project_id, draft);
+        const { nodes } = useSchematicStore.getState();
+        if (nodes.length === 0) {
+          set({
+            operationsMessage: "Place components on the schematic before capturing a draft.",
+          });
+          return;
+        }
+        // A draft capture is a lightweight vibe/narrative note — it must not
+        // require a fully wired schematic. Deriving the project id via
+        // compileProjectState() would throw "no nets found" for a
+        // placement-only canvas, blocking the exact light-fidelity, early
+        // capture workflow this feature exists for. The project id is a
+        // fixed constant across the single-project UI, so use it directly.
+        const draft: OperationsSequence = {
+          ...emptySequence(DEFAULT_PROJECT_ID),
+          narrative,
+        };
+        await saveOperationsDraft(DEFAULT_PROJECT_ID, draft);
         set({
           sequence: draft,
           operationsMessage: "Draft captured.",

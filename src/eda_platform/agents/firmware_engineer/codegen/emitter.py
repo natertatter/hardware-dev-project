@@ -4,6 +4,7 @@ from pathlib import Path
 
 from eda_platform.agents.firmware_engineer.codegen import templates
 from eda_platform.agents.firmware_engineer.models import SchedulingPlan
+from eda_platform.agents.operations_refiner.best_practices import is_boot_step
 from eda_platform.schemas import ComponentManifest, ComponentType, OperationsSequence, PinType, ProjectState
 
 
@@ -66,12 +67,24 @@ def _mcu_i2c_pins(
 def _boot_delays_from_operations(
     operations: OperationsSequence | None,
 ) -> list[tuple[int, str]]:
+    """One-shot delays to run sequentially in main() before threads spawn.
+
+    Only genuine boot/init steps qualify. A step with a one-shot delay that
+    is NOT part of boot (e.g. "pause before reversing motor direction",
+    an estop-release safety delay) describes a *runtime* pause that recurs
+    during normal operation — baking it into main()'s one-time startup
+    sequence would execute it once at boot and never again, silently
+    producing firmware that does not match the operations sequence.
+    """
     if operations is None:
         return []
     delays: list[tuple[int, str]] = []
     for step in operations.steps:
-        if step.timing and step.timing.delay_ms:
-            delays.append((step.timing.delay_ms, step.description))
+        if not (step.timing and step.timing.delay_ms):
+            continue
+        if not is_boot_step(step.description):
+            continue
+        delays.append((step.timing.delay_ms, step.description))
     return delays
 
 
