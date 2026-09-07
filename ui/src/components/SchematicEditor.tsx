@@ -12,7 +12,9 @@ import {
 import { useCallback, useEffect } from "react";
 
 import { HardwareNode } from "@/components/HardwareNode";
+import { OperationsPanel } from "@/components/OperationsPanel";
 import { ValidationPanel } from "@/components/ValidationPanel";
+import { useOperationsStore } from "@/store/useOperationsStore";
 import { useSchematicStore } from "@/store/useSchematicStore";
 
 import "@xyflow/react/dist/style.css";
@@ -40,6 +42,15 @@ function SchematicCanvas() {
   const firmwareOutputDir = useSchematicStore((s) => s.firmwareOutputDir);
   const firmwareMessage = useSchematicStore((s) => s.firmwareMessage);
   const actions = useSchematicStore((s) => s.actions);
+
+  const narrative = useOperationsStore((s) => s.narrative);
+  const refinedSequence = useOperationsStore((s) => s.refinedSequence);
+  const operationsStatus = useOperationsStore((s) => s.operationsStatus);
+  const operationsIssues = useOperationsStore((s) => s.operationsIssues);
+  const operationsMessage = useOperationsStore((s) => s.operationsMessage);
+  const refineMessage = useOperationsStore((s) => s.refineMessage);
+  const operationsApproved = useOperationsStore((s) => s.operationsApproved);
+  const opsActions = useOperationsStore((s) => s.actions);
 
   useEffect(() => {
     actions.loadCatalog();
@@ -98,7 +109,8 @@ function SchematicCanvas() {
             disabled={
               !schematicApproved ||
               validationStatus !== "pass" ||
-              firmwareStatus === "generating"
+              firmwareStatus === "generating" ||
+              (refinedSequence != null && !operationsApproved)
             }
             className="editor-shell__btn editor-shell__btn--firmware"
           >
@@ -182,6 +194,23 @@ function SchematicCanvas() {
         </main>
 
         <aside className="editor-shell__panel">
+          <OperationsPanel
+            narrative={narrative}
+            onNarrativeChange={opsActions.setNarrative}
+            fidelity={refinedSequence?.fidelity ?? null}
+            refinedSteps={refinedSequence?.steps ?? []}
+            openQuestions={refinedSequence?.open_questions ?? []}
+            status={operationsStatus}
+            issues={operationsIssues}
+            message={operationsMessage}
+            refineMessage={refineMessage}
+            operationsApproved={operationsApproved}
+            onCaptureDraft={opsActions.captureDraft}
+            onRefine={opsActions.refine}
+            onValidate={opsActions.validate}
+            onMerge={opsActions.mergeToMaster}
+            onApprove={opsActions.approveOperations}
+          />
           <ValidationPanel
             status={validationStatus}
             issues={validationIssues}

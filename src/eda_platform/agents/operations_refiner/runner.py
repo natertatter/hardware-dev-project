@@ -7,11 +7,12 @@ from eda_platform.agents.operations_refiner.best_practices import (
     I2C_SENSOR_POLL_PERIOD_MS,
     MOTOR_DIRECTION_CHANGE_PAUSE_MS,
     MOTOR_RAMP_DELAY_MS,
-    POWER_ON_SETTLE_MS,
     is_boot_step,
     is_peripheral_step,
     suggest_hal_call,
 )
+from eda_platform.agents.operations_refiner.manifest_timing import timing_for_step as manifest_timing_for_step
+from eda_platform.llm import get_narrative_parser
 from eda_platform.agents.operations_refiner.binder import (
     classification_for_node,
     match_node_for_step,
@@ -46,71 +47,41 @@ def _next_fidelity(current: FidelityLevel) -> FidelityLevel:
 
 
 def _narrative_to_steps(sequence: OperationsSequence) -> list[OperationStep]:
-    """Split narrative text into coarse steps (one per non-empty line or sentence)."""
+    """Parse narrative text into coarse steps via LLM or deterministic fallback."""
     if sequence.steps:
         return list(sequence.steps)
     if not sequence.narrative:
         return []
 
-    raw_lines = sequence.narrative.replace(".", ".\n").splitlines()
-    steps: list[OperationStep] = []
-    for i, line in enumerate(raw_lines):
-        text = line.strip()
-        if not text:
-            continue
-        steps.append(
-            OperationStep(
-                step_id=f"step_{i + 1}",
-                description=text,
-                provenance=ProvenanceSource.HUMAN,
-            )
+    parser = get_narrative_parser()
+    descriptions = parser.parse_narrative_to_steps(sequence.narrative)
+    return [
+        OperationStep(
+            step_id=f"step_{i + 1}",
+            description=text,
+            provenance=ProvenanceSource.HUMAN,
         )
-    return steps
+        for i, text in enumerate(descriptions)
+    ]
 
 
 def _timing_for_step(
     step: OperationStep,
     component_type: ComponentType | None,
+    manifest: ComponentManifest | None,
     poll_period_ms: int,
 ) -> TimingConstraint | None:
-    lower = step.description.lower()
-    if "estop" in lower or "e-stop" in lower:
-        return TimingConstraint(
-            delay_ms=ESTOP_RELEASE_DELAY_MS,
-            source=ProvenanceSource.BEST_PRACTICE,
-            note="Safety delay after estop release",
-        )
-    if "pause" in lower or "wait" in lower or "delay" in lower:
-        if "motor" in lower or "ramp" in lower:
-            return TimingConstraint(
-                delay_ms=MOTOR_RAMP_DELAY_MS,
-                source=ProvenanceSource.BEST_PRACTICE,
-                note="Motor ramp settling time",
-            )
-        if "direction" in lower:
-            return TimingConstraint(
-                delay_ms=MOTOR_DIRECTION_CHANGE_PAUSE_MS,
-                source=ProvenanceSource.BEST_PRACTICE,
-                note="Pause before reversing motor direction",
-            )
-        return TimingConstraint(
-            delay_ms=POWER_ON_SETTLE_MS,
-            source=ProvenanceSource.BEST_PRACTICE,
-            note="Generic settle delay",
-        )
-    if is_boot_step(step.description):
-        return TimingConstraint(
-            delay_ms=POWER_ON_SETTLE_MS,
-            source=ProvenanceSource.BEST_PRACTICE,
-            note="Power rail settle after enable",
-        )
-    if component_type == ComponentType.SENSOR and is_peripheral_step(step.description):
-        return TimingConstraint(
-            period_ms=poll_period_ms,
-            source=ProvenanceSource.BEST_PRACTICE,
-            note="I2C sensor poll interval (matches scheduling plan default)",
-        )
-    return None
+    return manifest_timing_for_step(
+        step.description,
+        component_type,
+        manifest,
+        poll_period_ms,
+        estop_delay_ms=ESTOP_RELEASE_DELAY_MS,
+        motor_ramp_ms=MOTOR_RAMP_DELAY_MS,
+        motor_direction_ms=MOTOR_DIRECTION_CHANGE_PAUSE_MS,
+        is_boot=is_boot_step(step.description),
+        is_peripheral=is_peripheral_step(step.description),
+    )
 
 
 def refine_operations(
@@ -200,7 +171,7 @@ def refine_operations(
                     manifest = manifests.get(node.component_id)
             component_type = manifest.type if manifest else None
             if updated.timing is None:
-                timing = _timing_for_step(updated, component_type, poll_period)
+                timing = _timing_for_step(updated, component_type, manifest, poll_period)
                 if timing:
                     updated.timing = timing
 

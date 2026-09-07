@@ -5,6 +5,20 @@ from pydantic import BaseModel, Field, field_validator
 from eda_platform.schemas.enums import ActiveState, ComponentType, PinType
 
 
+class OperationalConstraints(BaseModel):
+    """Timing and protocol constraints extracted from datasheets (Librarian output)."""
+
+    power_on_delay_ms: int | None = Field(
+        default=None, ge=0, description="Required delay after power rail enable (ms)"
+    )
+    conversion_time_ms: int | None = Field(
+        default=None, ge=0, description="Minimum time between sensor conversions (ms)"
+    )
+    i2c_max_clock_hz: int | None = Field(
+        default=None, ge=0, description="Maximum I2C clock frequency (Hz)"
+    )
+
+
 class PowerRequirements(BaseModel):
     """Operating power envelope extracted from Recommended Operating Conditions."""
 
@@ -46,6 +60,9 @@ class ComponentManifest(BaseModel):
     power_requirements: PowerRequirements
     default_i2c_address: str | None = Field(
         default=None, description="Default 7-bit I2C address in hex (e.g., 0x40)"
+    )
+    operational_constraints: OperationalConstraints | None = Field(
+        default=None, description="Datasheet-derived timing and protocol limits"
     )
     pins: list[Pin] = Field(..., min_length=1)
 

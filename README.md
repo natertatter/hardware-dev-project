@@ -52,6 +52,7 @@ npm run test       # net compiler + store unit tests
 | POST | `/api/v1/operations/refine` | Refine operations against schematic + manifests |
 | POST | `/api/v1/operations/validate` | Validate operations sequence |
 | POST | `/api/v1/operations/merge` | Promote refined sequence to master |
+| POST | `/api/v1/operations/generate-docs` | Generate operating procedure + bring-up checklist |
 
 See `docs/architecture/ENGINEERING_DECISIONS.md` for Phase 4–8 design rationale.
 

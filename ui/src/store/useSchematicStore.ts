@@ -12,6 +12,7 @@ import {
 
 import { autoWireProjectState, fetchManifests, generateFirmware, validateProjectState } from "@/lib/api";
 import type { CatalogEntry, HardwareNodeData, ProjectState } from "@/types/schemas";
+import { useOperationsStore } from "@/store/useOperationsStore";
 import { compileProjectState } from "@/utils/compileProjectState";
 import { decompileProjectState } from "@/utils/decompileProjectState";
 
@@ -67,6 +68,7 @@ function resetApprovalAndFirmware() {
 }
 
 function resetWorkflowState() {
+  useOperationsStore.getState().actions.resetOperationsApproval();
   return {
     ...resetApprovalAndFirmware(),
     autoWireStatus: "idle" as AutoWireStatus,
@@ -283,10 +285,24 @@ export const useSchematicStore = create<SchematicState>((set, get) => ({
       if (!get().schematicApproved || get().validationStatus !== "pass") {
         return;
       }
+      const opsState = useOperationsStore.getState();
+      const activeOps = opsState.actions.getActiveSequence();
+      if (activeOps && !opsState.operationsApproved) {
+        set({
+          firmwareStatus: "error",
+          firmwareMessage: "Approve operations before generating firmware.",
+        });
+        return;
+      }
       set({ firmwareStatus: "generating", firmwareMessage: null });
       try {
         const projectState = compileProjectState(get().nodes, get().edges);
-        const result = await generateFirmware(projectState, true);
+        const result = await generateFirmware(
+          projectState,
+          true,
+          activeOps,
+          opsState.operationsApproved,
+        );
         set({
           firmwareStatus: "success",
           firmwareOutputDir: result.output_dir,

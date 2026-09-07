@@ -2,6 +2,7 @@
 
 from eda_platform.schemas.component_manifest import (
     ComponentManifest,
+    OperationalConstraints,
     Pin,
     PowerRequirements,
 )
@@ -37,6 +38,7 @@ __all__ = [
     "NetType",
     "Node",
     "OpenQuestion",
+    "OperationalConstraints",
     "OperationStep",
     "OperationsSequence",
     "Pin",

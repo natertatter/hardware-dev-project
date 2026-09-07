@@ -2,13 +2,7 @@
 
 from pydantic import BaseModel, Field
 
-from eda_platform.schemas import (
-    ComponentManifest,
-    Net,
-    Node,
-    OperationsSequence,
-    ProjectState,
-)
+from eda_platform.schemas import ComponentManifest, Net, Node, OperationsSequence, ProjectState
 
 
 class SchematicDraft(BaseModel):
@@ -65,6 +59,14 @@ class GenerateFirmwareRequest(BaseModel):
     approved: bool = Field(
         ...,
         description="Must be true — schematic must be explicitly approved before codegen",
+    )
+    operations: OperationsSequence | None = Field(
+        default=None,
+        description="Optional operations sequence to embed in firmware and operating docs",
+    )
+    operations_approved: bool = Field(
+        default=False,
+        description="Must be true when operations are provided",
     )
     manifests: dict[str, ComponentManifest] | None = Field(
         default=None,
@@ -134,9 +136,23 @@ class SaveOperationsDraftResponse(BaseModel):
 
 class MergeOperationsRequest(BaseModel):
     operations: OperationsSequence
+    project_state: ProjectState | None = Field(
+        default=None,
+        description="Schematic for validation; loaded from disk when omitted",
+    )
     bump_version: bool = True
 
 
 class MergeOperationsResponse(BaseModel):
     master: OperationsSequence
     message: str
+
+
+class GenerateOperatingDocsRequest(BaseModel):
+    operations: OperationsSequence
+    project_state: ProjectState
+
+
+class GenerateOperatingDocsResponse(BaseModel):
+    operating_procedure: str
+    bringup_checklist: str

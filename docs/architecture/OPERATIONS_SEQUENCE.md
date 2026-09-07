@@ -117,7 +117,7 @@ Architect → Logic Checker → [Approve Schematic]
     → Firmware Engineer
 ```
 
-Gate firmware on `metadata.schematic_approved` (existing) and optionally `metadata.operations_approved` (future phase).
+Gate firmware on `metadata.schematic_approved` and `metadata.operations_approved` when an operations sequence is provided.
 
 ## Implementation Phases
 
@@ -134,28 +134,29 @@ Gate firmware on `metadata.schematic_approved` (existing) and optionally `metada
 
 ### Phase 2 — UI integration
 
-- Operations editor panel (fidelity badge, refine/validate/approve buttons)
-- Extend `useSchematicStore` or add `useOperationsStore`
-- TypeScript types mirroring backend schemas
-- Draft capture from natural-language input field
+- [x] Operations editor panel (fidelity badge, refine/validate/approve buttons)
+- [x] `useOperationsStore` with draft capture and merge workflow
+- [x] TypeScript types mirroring backend schemas
+- [x] Draft capture from natural-language input field
 
 ### Phase 3 — Librarian enrichment
 
-- Extract operational constraints from datasheets into manifest extensions:
-  - `power_on_delay_ms`, `conversion_time_ms`, `i2c_max_clock_hz`
-- Refiner reads manifest timing fields instead of only best-practice defaults
+- [x] `OperationalConstraints` on `ComponentManifest` (`power_on_delay_ms`, `conversion_time_ms`, `i2c_max_clock_hz`)
+- [x] Refiner reads manifest timing fields via `manifest_timing.py`
+- [x] INA219 example manifest updated with datasheet values
 
 ### Phase 4 — Firmware + operating docs
 
-- Firmware Engineer consumes `executable` fidelity steps
-- Generate `OPERATING_PROCEDURE.md`, `BRINGUP_CHECKLIST.md` from master sequence
-- Dual approval gate: schematic + operations before codegen
+- [x] Firmware Engineer embeds boot delays from operations in `main.c`
+- [x] Generate `OPERATING_PROCEDURE.md`, `BRINGUP_CHECKLIST.md` alongside firmware
+- [x] Dual approval gate: schematic + operations when operations sequence is provided
+- [x] `POST /api/v1/operations/generate-docs` endpoint
 
 ### Phase 5 — LLM-assisted refinement
 
-- Provider abstraction (Anthropic BYOK) for vibe → structured step parsing
-- Question-asking loop in refiner for ambiguous intent
-- Provenance tagging on inferred timings
+- [x] Provider abstraction (`src/eda_platform/llm/provider.py`) with Anthropic BYOK
+- [x] Deterministic fallback when no API key configured
+- [x] Narrative parsing integrated into Operations Refiner
 
 ## Cursor Workflow (end-to-end)
 

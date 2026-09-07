@@ -236,7 +236,11 @@ void *task_background(void *arg) {
 """
 
 
-def main_c(plan: SchedulingPlan, sensors: list[dict]) -> str:
+def main_c(
+    plan: SchedulingPlan,
+    sensors: list[dict],
+    boot_delays: list[tuple[int, str]] | None = None,
+) -> str:
     has_sensor_poll = any(t.task_id == "task_sensor_poll" for t in plan.tasks)
     has_background = any(t.task_id == "task_background" for t in plan.tasks)
 
@@ -252,6 +256,15 @@ def main_c(plan: SchedulingPlan, sensors: list[dict]) -> str:
     background_spawn = (
         '    spawn_thread(task_background, "task_background");' if has_background else ""
     )
+
+    boot_lines = ""
+    if boot_delays:
+        for ms, comment in boot_delays:
+            safe_comment = comment.replace('"', "'")
+            boot_lines += (
+                f'    printf("[boot] {safe_comment} ({ms} ms)\\n");\n'
+                f"    usleep({ms * 1000});\n"
+            )
 
     return f"""/* Auto-generated firmware entry point — {plan.project_id} */
 #include <pthread.h>
@@ -281,6 +294,7 @@ int main(void) {{
 
     printf("EDA Platform firmware — project: {plan.project_id} (platform: {plan.platform})\\n");
 
+{boot_lines}
     if (hal_i2c_bus_0_init() != 0) {{
         fprintf(stderr, "I2C bus init failed — enable I2C on Pi (raspi-config)\\n");
         return 1;

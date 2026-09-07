@@ -26,6 +26,8 @@ def generate_firmware_endpoint(body: GenerateFirmwareRequest) -> GenerateFirmwar
             body.project_state,
             manifests,
             approved=body.approved,
+            operations=body.operations,
+            operations_approved=body.operations_approved,
         )
     except FirmwareEngineerError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc

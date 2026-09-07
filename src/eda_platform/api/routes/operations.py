@@ -2,14 +2,20 @@
 
 from fastapi import APIRouter, HTTPException
 
-from eda_platform.agents.operations_refiner import OperationsRefinerError
+from eda_platform.agents.operations_docs import (
+    generate_bringup_checklist,
+    generate_operating_procedure,
+)
 from eda_platform.api.manifest_loader import load_all_manifests
 from eda_platform.api.project_loader import (
     load_operations_master,
     save_operations_draft,
     save_operations_master,
 )
+from eda_platform.agents.operations_refiner import OperationsRefinerError
 from eda_platform.api.schemas import (
+    GenerateOperatingDocsRequest,
+    GenerateOperatingDocsResponse,
     MergeOperationsRequest,
     MergeOperationsResponse,
     OperationsValidationIssueResponse,
@@ -131,13 +137,20 @@ def validate_operations_endpoint(body: ValidateOperationsRequest) -> ValidateOpe
     )
 
 
+@router.post("/operations/generate-docs", response_model=GenerateOperatingDocsResponse)
+def generate_operating_docs_endpoint(
+    body: GenerateOperatingDocsRequest,
+) -> GenerateOperatingDocsResponse:
+    return GenerateOperatingDocsResponse(
+        operating_procedure=generate_operating_procedure(body.operations, body.project_state),
+        bringup_checklist=generate_bringup_checklist(body.operations, body.project_state),
+    )
+
+
 @router.post("/operations/merge", response_model=MergeOperationsResponse)
 def merge_operations_endpoint(body: MergeOperationsRequest) -> MergeOperationsResponse:
-    validation = run_operations_validate(
-        body.operations,
-        _load_schematic_or_400(body.operations.project_id),
-        load_all_manifests(),
-    )
+    schematic = body.project_state or _load_schematic_or_400(body.operations.project_id)
+    validation = run_operations_validate(body.operations, schematic, load_all_manifests())
     if not validation.success:
         raise HTTPException(
             status_code=422,
