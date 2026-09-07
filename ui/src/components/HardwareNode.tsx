@@ -1,17 +1,19 @@
 "use client";
 
-import { memo } from "react";
+import { memo, useMemo } from "react";
 import { Handle, Position, type Node, type NodeProps } from "@xyflow/react";
 
+import { ProtocolSelector } from "@/components/ProtocolSelector";
 import type { HardwareNodeData, Pin, PinType } from "@/types/schemas";
+import {
+  availableProtocols,
+  defaultProtocol,
+  pinsForProtocol,
+} from "@/utils/protocolProfiles";
 
 /**
  * Left side: input pins and power pins (POWER, GND, GPIO_IN, I2C/SPI/UART/ANALOG
  * inputs). Right side: output and signal pins (GPIO_OUT, SPI_MOSI/SCK/CS, UART_TX).
- *
- * This intentionally does not distinguish a POWER pin that sources voltage (e.g.
- * a regulated 3V3_OUT rail) from one that consumes it (e.g. VBUS) — per the
- * spec, all "Power" pins render on the left regardless of pin_id naming.
  */
 const LEFT_PIN_TYPES: ReadonlySet<PinType> = new Set([
   "POWER",
@@ -38,21 +40,6 @@ function isLeftSidePin(pin: Pin): boolean {
   return true;
 }
 
-/**
- * All handles are declared type="source", regardless of visual side.
- *
- * The React Flow docs for `ConnectionMode.Loose` are explicit: loose mode
- * allows source-to-source connections but "does not support target-to-target
- * connections" (https://reactflow.dev/api-reference/react-flow#connectionmode;
- * confirmed by xyflow maintainers in github.com/xyflow/xyflow/issues/5758).
- * Since our left-side pins (GND, POWER, I2C_SDA, I2C_SCL, ...) are exactly
- * the pins that need to wire to the SAME pin type on another node — GND to
- * GND, SDA to SDA — typing them "target" would make those connections
- * silently undraggable. Visual placement is controlled independently via the
- * `position` prop (Position.Left / Position.Right) passed to <Handle>, so
- * this does not affect the Task 2 requirement to render inputs/power on the
- * left and outputs/signals on the right.
- */
 const HANDLE_TYPE = "source" as const;
 
 function PinRow({
@@ -97,12 +84,18 @@ function PinRow({
   );
 }
 
-function HardwareNodeComponent({
-  data,
-}: NodeProps<Node<HardwareNodeData>>) {
-  const { manifest } = data;
-  const leftPins = manifest.pins.filter(isLeftSidePin);
-  const rightPins = manifest.pins.filter((p) => !isLeftSidePin(p));
+function HardwareNodeComponent({ id, data }: NodeProps<Node<HardwareNodeData>>) {
+  const { manifest, selected_protocol } = data;
+  const protocols = useMemo(() => availableProtocols(manifest), [manifest]);
+  const activeProtocol =
+    selected_protocol ?? defaultProtocol(manifest) ?? protocols[0] ?? null;
+  const visiblePins = useMemo(
+    () => pinsForProtocol(manifest, activeProtocol),
+    [manifest, activeProtocol],
+  );
+
+  const leftPins = visiblePins.filter(isLeftSidePin);
+  const rightPins = visiblePins.filter((p) => !isLeftSidePin(p));
 
   return (
     <div className="hardware-node">
@@ -111,6 +104,12 @@ function HardwareNodeComponent({
         <strong className="hardware-node__name">{manifest.name}</strong>
         <span className="hardware-node__id">{manifest.component_id}</span>
       </header>
+
+      <ProtocolSelector
+        nodeId={id}
+        selectedProtocol={activeProtocol}
+        protocols={protocols}
+      />
 
       <div className="hardware-node__body">
         <div className="hardware-node__column hardware-node__column--left">

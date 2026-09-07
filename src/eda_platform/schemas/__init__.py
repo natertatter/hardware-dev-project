@@ -17,6 +17,12 @@ from eda_platform.schemas.project_state import (
     Node,
     ProjectState,
 )
+from eda_platform.schemas.protocols import (
+    available_protocols,
+    default_protocol,
+    derive_protocol_profiles,
+    pins_for_protocol,
+)
 
 __all__ = [
     "ActiveState",
@@ -30,4 +36,8 @@ __all__ = [
     "PinType",
     "PowerRequirements",
     "ProjectState",
+    "available_protocols",
+    "default_protocol",
+    "derive_protocol_profiles",
+    "pins_for_protocol",
 ]

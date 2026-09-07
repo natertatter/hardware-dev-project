@@ -47,6 +47,14 @@ class ComponentManifest(BaseModel):
     default_i2c_address: str | None = Field(
         default=None, description="Default 7-bit I2C address in hex (e.g., 0x40)"
     )
+    default_protocol: str | None = Field(
+        default=None,
+        description="Preferred communication protocol when multiple are available (e.g., I2C)",
+    )
+    protocol_profiles: dict[str, list[str]] | None = Field(
+        default=None,
+        description="Explicit protocol → pin_id mapping; derived from pins when omitted",
+    )
     pins: list[Pin] = Field(..., min_length=1)
 
     @field_validator("default_i2c_address")

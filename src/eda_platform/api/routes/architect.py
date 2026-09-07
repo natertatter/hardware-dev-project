@@ -2,7 +2,7 @@
 
 from fastapi import APIRouter, HTTPException
 
-from eda_platform.agents.architect.template_layout import template_i2c_layout
+from eda_platform.agents.architect.template_layout import template_auto_wire
 from eda_platform.api.manifest_loader import load_all_manifests
 from eda_platform.api.schemas import AutoWireRequest, AutoWireResponse
 from eda_platform.schemas import ComponentManifest, Net, NetConnection, NetType, PinType, ProjectState
@@ -55,7 +55,7 @@ def auto_wire_schematic(body: AutoWireRequest) -> AutoWireResponse:
     had_nets = bool(draft.nets)
 
     try:
-        updated_state, wires_added = template_i2c_layout(
+        updated_state, wires_added = template_auto_wire(
             _draft_to_project_state(draft, manifests), manifests
         )
     except ValueError as exc:

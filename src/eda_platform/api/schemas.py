@@ -72,3 +72,9 @@ class GenerateFirmwareResponse(BaseModel):
     output_dir: str
     files_written: list[str]
     message: str
+
+
+class UploadManifestResponse(BaseModel):
+    manifest: ComponentManifest
+    saved_path: str
+    message: str
