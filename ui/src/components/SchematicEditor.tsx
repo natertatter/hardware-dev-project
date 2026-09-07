@@ -2,26 +2,36 @@
 
 import {
   Background,
+  BackgroundVariant,
+  ConnectionMode,
   Controls,
   MiniMap,
   ReactFlow,
   ReactFlowProvider,
+  useReactFlow,
 } from "@xyflow/react";
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useRef } from "react";
 
 import { HardwareNode } from "@/components/HardwareNode";
 import { ValidationPanel } from "@/components/ValidationPanel";
 import { useSchematicStore } from "@/store/useSchematicStore";
+import type { CatalogEntry } from "@/types/schemas";
 
 import "@xyflow/react/dist/style.css";
 
 const nodeTypes = { hardware: HardwareNode };
+
+const defaultEdgeOptions = {
+  type: "smoothstep" as const,
+  style: { stroke: "var(--lab-border)", strokeWidth: 2 },
+};
 
 function SchematicCanvas() {
   const nodes = useSchematicStore((s) => s.nodes);
   const edges = useSchematicStore((s) => s.edges);
   const catalog = useSchematicStore((s) => s.catalog);
   const catalogLoaded = useSchematicStore((s) => s.catalogLoaded);
+  const catalogSource = useSchematicStore((s) => s.catalogSource);
   const validationStatus = useSchematicStore((s) => s.validationStatus);
   const validationIssues = useSchematicStore((s) => s.validationIssues);
   const validationMessage = useSchematicStore((s) => s.validationMessage);
@@ -33,10 +43,33 @@ function SchematicCanvas() {
   const firmwareOutputDir = useSchematicStore((s) => s.firmwareOutputDir);
   const firmwareMessage = useSchematicStore((s) => s.firmwareMessage);
   const actions = useSchematicStore((s) => s.actions);
+  const { screenToFlowPosition } = useReactFlow();
+  const canvasRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
     actions.loadCatalog();
   }, [actions]);
+
+  const placeFromCatalog = useCallback(
+    (entry: CatalogEntry) => {
+      const canvas = canvasRef.current;
+      if (canvas) {
+        const rect = canvas.getBoundingClientRect();
+        const center = screenToFlowPosition({
+          x: rect.left + rect.width / 2,
+          y: rect.top + rect.height / 2,
+        });
+        const stackOffset = nodes.length % 6;
+        actions.addNodeFromCatalog(entry, {
+          x: center.x + stackOffset * 28 - 70,
+          y: center.y + stackOffset * 24 - 50,
+        });
+        return;
+      }
+      actions.addNodeFromCatalog(entry);
+    },
+    [actions, nodes.length, screenToFlowPosition],
+  );
 
   const onNodesChange = useCallback(
     (changes: Parameters<typeof actions.onNodesChange>[0]) => actions.onNodesChange(changes),
@@ -52,27 +85,28 @@ function SchematicCanvas() {
   );
 
   return (
-    <div className="flex h-screen w-full flex-col bg-slate-950 text-slate-100">
-      <header className="flex items-center justify-between border-b border-slate-800 px-4 py-3">
-        <div>
-          <h1 className="text-lg font-semibold">EDA Platform — Schematic Editor</h1>
-          <p className="text-xs text-slate-400">
-            Drag components, wire pins, validate against the Logic Checker API.
-          </p>
+    <div className="editor-shell">
+      <header className="editor-shell__toolbar">
+        <div className="editor-shell__brand">
+          <div className="editor-shell__logo" aria-hidden="true" />
+          <div>
+            <h1>EDA Platform</h1>
+            <p className="editor-shell__tagline">Industrial schematic lab</p>
+          </div>
         </div>
-        <div className="flex gap-2">
+        <div className="editor-shell__actions">
           <button
             type="button"
             onClick={() => actions.autoWire()}
-            className="rounded-md border border-slate-600 px-3 py-1.5 text-sm hover:bg-slate-800"
+            className="editor-shell__btn"
           >
-            Auto-Wire (I2C)
+            Auto-Wire
           </button>
           <button
             type="button"
             onClick={() => actions.validateArchitecture()}
             disabled={validationStatus === "validating"}
-            className="rounded-md bg-emerald-600 px-3 py-1.5 text-sm font-medium hover:bg-emerald-500 disabled:opacity-50"
+            className="editor-shell__btn editor-shell__btn--validate"
           >
             {validationStatus === "validating" ? "Validating…" : "Validate Architecture"}
           </button>
@@ -80,9 +114,9 @@ function SchematicCanvas() {
             type="button"
             onClick={() => actions.approveSchematic()}
             disabled={validationStatus !== "pass" || schematicApproved}
-            className="rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium hover:bg-blue-500 disabled:opacity-50"
+            className="editor-shell__btn editor-shell__btn--approve"
           >
-            {schematicApproved ? "Schematic Approved" : "Approve Schematic"}
+            {schematicApproved ? "Approved" : "Approve"}
           </button>
           <button
             type="button"
@@ -92,41 +126,48 @@ function SchematicCanvas() {
               validationStatus !== "pass" ||
               firmwareStatus === "generating"
             }
-            className="rounded-md bg-violet-600 px-3 py-1.5 text-sm font-medium hover:bg-violet-500 disabled:opacity-50"
+            className="editor-shell__btn editor-shell__btn--firmware"
           >
             {firmwareStatus === "generating" ? "Generating…" : "Generate Firmware"}
           </button>
         </div>
       </header>
 
-      <div className="flex flex-1 overflow-hidden">
-        <aside className="w-56 shrink-0 overflow-y-auto border-r border-slate-800 p-3">
-          <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
-            Component Catalog
-          </h2>
-          {!catalogLoaded && !catalogError ? (
-            <p className="text-xs text-slate-500">Loading manifests…</p>
+      <div className="editor-shell__body">
+        <aside className="schematic-editor__sidebar">
+          <h2 className="schematic-editor__title">Parts Library</h2>
+          <p className="schematic-editor__hint">
+            Click a module to place it on the drafting table. Orthogonal traces only.
+          </p>
+          {catalogSource === "mock" && (
+            <p className="schematic-editor__offline-note">
+              API offline — using built-in parts library. Start the API for live manifests.
+            </p>
+          )}
+          {!catalogLoaded ? (
+            <p className="schematic-editor__hint">Loading catalog…</p>
           ) : catalogError ? (
-            <div className="space-y-2">
-              <p className="text-xs text-red-400">{catalogError}</p>
+            <>
+              <p className="panel-card__message panel-card__message--error">{catalogError}</p>
               <button
                 type="button"
                 onClick={() => actions.loadCatalog()}
-                className="w-full rounded border border-slate-600 px-2 py-1.5 text-sm hover:bg-slate-900"
+                className="schematic-editor__catalog-btn"
               >
                 Retry
               </button>
-            </div>
+            </>
           ) : (
-            <ul className="space-y-2">
+            <ul className="schematic-editor__catalog">
               {catalog.map((entry) => (
                 <li key={entry.manifest.component_id}>
                   <button
                     type="button"
-                    onClick={() => actions.addNodeFromCatalog(entry)}
-                    className="w-full rounded border border-slate-700 px-2 py-1.5 text-left text-sm hover:border-slate-500 hover:bg-slate-900"
+                    onClick={() => placeFromCatalog(entry)}
+                    className="schematic-editor__catalog-btn"
                   >
-                    {entry.label}
+                    <span className="schematic-editor__catalog-type">{entry.manifest.type}</span>
+                    <span className="schematic-editor__catalog-name">{entry.label}</span>
                   </button>
                 </li>
               ))}
@@ -134,7 +175,16 @@ function SchematicCanvas() {
           )}
         </aside>
 
-        <main className="relative flex-1">
+        <main className="schematic-editor__canvas" ref={canvasRef}>
+          {nodes.length === 0 && (
+            <div className="canvas-empty">
+              <div className="canvas-empty__reticle" aria-hidden="true" />
+              <p className="canvas-empty__title">Drafting table ready</p>
+              <p className="canvas-empty__text">
+                Place modules from the library. Wire pins with 90° traces, then validate and compile firmware.
+              </p>
+            </div>
+          )}
           <ReactFlow
             nodes={nodes}
             edges={edges}
@@ -142,16 +192,30 @@ function SchematicCanvas() {
             onEdgesChange={onEdgesChange}
             onConnect={onConnect}
             nodeTypes={nodeTypes}
+            connectionMode={ConnectionMode.Loose}
+            defaultEdgeOptions={defaultEdgeOptions}
+            connectionLineStyle={{ stroke: "var(--pop-blue)", strokeWidth: 2 }}
             fitView
-            className="bg-slate-950"
+            fitViewOptions={{ padding: 0.2 }}
+            minZoom={0.25}
+            maxZoom={2}
           >
-            <Background gap={16} color="#334155" />
+            <Background
+              variant={BackgroundVariant.Dots}
+              gap={20}
+              size={1}
+              color="var(--lab-border)"
+            />
             <Controls />
-            <MiniMap nodeColor="#1e293b" maskColor="rgba(15,23,42,0.8)" />
+            <MiniMap
+              nodeColor="var(--lab-surface)"
+              maskColor="rgba(28, 30, 33, 0.92)"
+              className="schematic-minimap"
+            />
           </ReactFlow>
         </main>
 
-        <aside className="w-72 shrink-0 overflow-y-auto border-l border-slate-800 p-3">
+        <aside className="editor-shell__panel">
           <ValidationPanel
             status={validationStatus}
             issues={validationIssues}

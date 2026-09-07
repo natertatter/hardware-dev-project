@@ -10,6 +10,7 @@ import {
   type NodeChange,
 } from "@xyflow/react";
 
+import { COMPONENT_CATALOG } from "@/data/mockCatalog";
 import { autoWireProjectState, fetchManifests, generateFirmware, validateProjectState } from "@/lib/api";
 import type { CatalogEntry, HardwareNodeData, ProjectState } from "@/types/schemas";
 import { compileProjectState } from "@/utils/compileProjectState";
@@ -18,6 +19,7 @@ import { decompileProjectState } from "@/utils/decompileProjectState";
 export type ValidationStatus = "idle" | "validating" | "pass" | "fail" | "error";
 export type FirmwareStatus = "idle" | "generating" | "success" | "error";
 export type AutoWireStatus = "idle" | "wiring" | "success" | "error";
+export type CatalogSource = "api" | "mock";
 
 export interface ValidationIssueView {
   rule: string;
@@ -32,6 +34,7 @@ interface SchematicState {
   catalog: CatalogEntry[];
   catalogLoaded: boolean;
   catalogError: string | null;
+  catalogSource: CatalogSource | null;
   validationStatus: ValidationStatus;
   validationIssues: ValidationIssueView[];
   validationMessage: string | null;
@@ -45,7 +48,7 @@ interface SchematicState {
     onNodesChange: (changes: NodeChange<Node<HardwareNodeData>>[]) => void;
     onEdgesChange: (changes: EdgeChange[]) => void;
     onConnect: (connection: Connection) => void;
-    addNodeFromCatalog: (entry: CatalogEntry) => void;
+    addNodeFromCatalog: (entry: CatalogEntry, position?: { x: number; y: number }) => void;
     loadCatalog: () => Promise<void>;
     validateArchitecture: () => Promise<void>;
     autoWire: () => Promise<void>;
@@ -57,15 +60,41 @@ interface SchematicState {
 
 let nodeCounter = 0;
 
-function resetWorkflowState() {
+function resetApprovalAndFirmware() {
   return {
     schematicApproved: false,
     firmwareStatus: "idle" as FirmwareStatus,
     firmwareOutputDir: null,
     firmwareMessage: null,
+  };
+}
+
+function resetWorkflowState() {
+  return {
+    ...resetApprovalAndFirmware(),
     autoWireStatus: "idle" as AutoWireStatus,
     autoWireMessage: null,
   };
+}
+
+function isUserDrivenNodeChange(changes: NodeChange<Node<HardwareNodeData>>[]): boolean {
+  return changes.some(
+    (change) =>
+      change.type === "remove" ||
+      change.type === "add" ||
+      (change.type === "position" && "dragging" in change && change.dragging === false),
+  );
+}
+
+function isUserDrivenEdgeChange(changes: EdgeChange[]): boolean {
+  return changes.some((change) => change.type === "remove");
+}
+
+function mockCatalogEntries(): CatalogEntry[] {
+  return COMPONENT_CATALOG.map((manifest) => ({
+    label: manifest.name,
+    manifest,
+  }));
 }
 
 function placementOnlyProjectState(
@@ -92,6 +121,7 @@ export const useSchematicStore = create<SchematicState>((set, get) => ({
   catalog: [],
   catalogLoaded: false,
   catalogError: null,
+  catalogSource: null,
   validationStatus: "idle",
   validationIssues: [],
   validationMessage: null,
@@ -105,13 +135,13 @@ export const useSchematicStore = create<SchematicState>((set, get) => ({
     onNodesChange: (changes) => {
       set({
         nodes: applyNodeChanges(changes, get().nodes),
-        ...resetWorkflowState(),
+        ...(isUserDrivenNodeChange(changes) ? resetWorkflowState() : {}),
       });
     },
     onEdgesChange: (changes) => {
       set({
         edges: applyEdgeChanges(changes, get().edges),
-        ...resetWorkflowState(),
+        ...(isUserDrivenEdgeChange(changes) ? resetWorkflowState() : {}),
       });
     },
     onConnect: (connection) => {
@@ -126,12 +156,16 @@ export const useSchematicStore = create<SchematicState>((set, get) => ({
         ...resetWorkflowState(),
       });
     },
-    addNodeFromCatalog: (entry) => {
+    addNodeFromCatalog: (entry, position) => {
       nodeCounter += 1;
+      const stackOffset = (nodeCounter - 1) % 6;
       const newNode: Node<HardwareNodeData> = {
         id: `node-${entry.manifest.component_id}-${nodeCounter}`,
         type: "hardware",
-        position: { x: 120 + nodeCounter * 40, y: 80 + nodeCounter * 30 },
+        position: position ?? {
+          x: 120 + stackOffset * 48,
+          y: 80 + stackOffset * 36,
+        },
         data: {
           label: entry.label,
           manifest: entry.manifest,
@@ -143,18 +177,22 @@ export const useSchematicStore = create<SchematicState>((set, get) => ({
       });
     },
     loadCatalog: async () => {
-      set({ catalogLoaded: false, catalogError: null });
+      set({ catalogLoaded: false, catalogError: null, catalogSource: null });
       try {
         const manifests = await fetchManifests();
         const catalog: CatalogEntry[] = manifests.map((manifest) => ({
           label: manifest.name,
           manifest,
         }));
-        set({ catalog, catalogLoaded: true, catalogError: null });
+        set({ catalog, catalogLoaded: true, catalogError: null, catalogSource: "api" });
       } catch (err) {
-        const message = err instanceof Error ? err.message : "Failed to load manifest catalog.";
-        console.error("Failed to load manifest catalog:", err);
-        set({ catalog: [], catalogLoaded: false, catalogError: message });
+        console.warn("API catalog unavailable; using built-in parts library.", err);
+        set({
+          catalog: mockCatalogEntries(),
+          catalogLoaded: true,
+          catalogError: null,
+          catalogSource: "mock",
+        });
       }
     },
     validateArchitecture: async () => {
@@ -240,7 +278,10 @@ export const useSchematicStore = create<SchematicState>((set, get) => ({
         set({
           nodes,
           edges,
-          ...resetWorkflowState(),
+          ...resetApprovalAndFirmware(),
+          validationStatus: "idle",
+          validationIssues: [],
+          validationMessage: null,
           autoWireStatus: "success",
           autoWireMessage: `Added ${response.wires_added} net(s).`,
         });
