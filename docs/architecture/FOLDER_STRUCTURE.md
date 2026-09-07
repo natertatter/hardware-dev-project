@@ -21,12 +21,16 @@ hardware-dev-project/
 │   │   ├── __init__.py
 │   │   ├── enums.py
 │   │   ├── component_manifest.py       # ComponentManifest schema
-│   │   └── project_state.py            # ProjectState schema
+│   │   ├── project_state.py            # ProjectState schema
+│   │   ├── operations_sequence.py      # OperationsSequence schema
+│   │   └── project_metadata.py         # Project approval metadata
 │   ├── agents/                         # Specialized swarm agents
 │   │   ├── __init__.py
 │   │   ├── librarian/                  # PDF → ComponentManifest
 │   │   ├── architect/                  # Intent → ProjectState layout
 │   │   ├── logic_checker/              # ProjectState validation
+│   │   ├── operations_refiner/         # Vibe/draft → refined operations
+│   │   ├── operations_checker/         # Operations vs schematic validation
 │   │   └── firmware_engineer/          # ProjectState → HAL + firmware
 │   └── orchestration/                  # Agent routing & handoff pipeline
 │       └── __init__.py
@@ -37,7 +41,13 @@ hardware-dev-project/
 │       ├── *.example.json              # Reference fixtures (validated by tests)
 │
 ├── projects/                           # User project artifacts
-│   ├── <project_id>/                   # Per-project ProjectState & metadata
+│   ├── <project_id>/                   # Per-project schematic, metadata, operations
+│   │   ├── schematic.json
+│   │   ├── metadata.json
+│   │   └── operations/
+│   │       ├── master.json
+│   │       ├── drafts/
+│   │       └── refined/
 │   └── *.example.json                  # Reference ProjectState fixtures
 │
 ├── generated/                          # Agent output (never hand-edited)

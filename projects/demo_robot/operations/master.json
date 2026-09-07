@@ -1,0 +1,8 @@
+{
+  "project_id": "demo_robot",
+  "fidelity": "narrative",
+  "version": 1,
+  "narrative": "Enable power rail and wait for settle.\nPoll sensor_1 current reading every cycle.\nIf current exceeds threshold, log alarm.",
+  "steps": [],
+  "open_questions": []
+}

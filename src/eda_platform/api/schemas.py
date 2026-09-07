@@ -2,7 +2,13 @@
 
 from pydantic import BaseModel, Field
 
-from eda_platform.schemas import ComponentManifest, Net, Node, ProjectState
+from eda_platform.schemas import (
+    ComponentManifest,
+    Net,
+    Node,
+    OperationsSequence,
+    ProjectState,
+)
 
 
 class SchematicDraft(BaseModel):
@@ -71,4 +77,66 @@ class GenerateFirmwareResponse(BaseModel):
     project_id: str
     output_dir: str
     files_written: list[str]
+    message: str
+
+
+class RefineOperationsRequest(BaseModel):
+    operations: OperationsSequence
+    project_state: ProjectState
+    manifests: dict[str, ComponentManifest] | None = Field(
+        default=None,
+        description="Optional manifest overrides; server catalog used when omitted",
+    )
+    persist: bool = Field(
+        default=True,
+        description="Write refined output to projects/<id>/operations/refined/",
+    )
+
+
+class RefineOperationsResponse(BaseModel):
+    refined: OperationsSequence
+    fidelity_promoted: bool
+    previous_fidelity: str
+    steps_bound: int
+    questions_added: int
+    warnings: list[str] = Field(default_factory=list)
+
+
+class ValidateOperationsRequest(BaseModel):
+    operations: OperationsSequence
+    project_state: ProjectState
+    manifests: dict[str, ComponentManifest] | None = Field(
+        default=None,
+        description="Optional manifest overrides; server catalog used when omitted",
+    )
+
+
+class OperationsValidationIssueResponse(BaseModel):
+    rule: str
+    severity: str
+    message: str
+    step_id: str | None = None
+    node_id: str | None = None
+
+
+class ValidateOperationsResponse(BaseModel):
+    valid: bool
+    errors: list[OperationsValidationIssueResponse]
+
+
+class SaveOperationsDraftRequest(BaseModel):
+    operations: OperationsSequence
+
+
+class SaveOperationsDraftResponse(BaseModel):
+    saved_path: str
+
+
+class MergeOperationsRequest(BaseModel):
+    operations: OperationsSequence
+    bump_version: bool = True
+
+
+class MergeOperationsResponse(BaseModel):
+    master: OperationsSequence
     message: str
