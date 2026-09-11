@@ -64,6 +64,14 @@ class ComponentManifest(BaseModel):
     operational_constraints: OperationalConstraints | None = Field(
         default=None, description="Datasheet-derived timing and protocol limits"
     )
+    default_protocol: str | None = Field(
+        default=None,
+        description="Preferred communication protocol when multiple are available (e.g., I2C)",
+    )
+    protocol_profiles: dict[str, list[str]] | None = Field(
+        default=None,
+        description="Explicit protocol → pin_id mapping; derived from pins when omitted",
+    )
     pins: list[Pin] = Field(..., min_length=1)
 
     @field_validator("default_i2c_address")

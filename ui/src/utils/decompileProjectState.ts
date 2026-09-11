@@ -32,6 +32,7 @@ export function decompileProjectState(
         manifest,
         label: manifest.name,
         assigned_i2c_address: psNode.assigned_i2c_address ?? manifest.default_i2c_address ?? null,
+        selected_protocol: psNode.selected_protocol ?? null,
       },
     };
   });

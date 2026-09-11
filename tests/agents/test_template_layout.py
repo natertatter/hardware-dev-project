@@ -29,8 +29,8 @@ def test_template_i2c_layout_adds_four_nets():
     net_ids = {n.net_id for n in updated.nets}
     assert "auto_sensor_1_vcc" in net_ids
     assert "auto_sensor_1_gnd" in net_ids
-    assert "auto_sensor_1_sda" in net_ids
-    assert "auto_sensor_1_scl" in net_ids
+    assert "auto_sensor_1_i2c_sda" in net_ids
+    assert "auto_sensor_1_i2c_scl" in net_ids
 
     vcc = next(n for n in updated.nets if n.net_id == "auto_sensor_1_vcc")
     pins = {(c.node_id, c.pin_id) for c in vcc.connections}

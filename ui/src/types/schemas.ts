@@ -55,6 +55,8 @@ export interface ComponentManifest {
   power_requirements: PowerRequirements;
   default_i2c_address?: string | null;
   operational_constraints?: OperationalConstraints | null;
+  default_protocol?: string | null;
+  protocol_profiles?: Record<string, string[]> | null;
   pins: Pin[];
 }
 
@@ -62,6 +64,7 @@ export interface ProjectStateNode {
   node_id: string;
   component_id: string;
   assigned_i2c_address?: string | null;
+  selected_protocol?: string | null;
 }
 
 export interface NetConnection {
@@ -91,6 +94,7 @@ export interface CatalogEntry {
 export interface HardwareNodeData {
   manifest: ComponentManifest;
   assigned_i2c_address?: string | null;
+  selected_protocol?: string | null;
   label?: string;
   [key: string]: unknown;
 }

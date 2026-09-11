@@ -156,3 +156,9 @@ class GenerateOperatingDocsRequest(BaseModel):
 class GenerateOperatingDocsResponse(BaseModel):
     operating_procedure: str
     bringup_checklist: str
+
+
+class UploadManifestResponse(BaseModel):
+    manifest: ComponentManifest
+    saved_path: str
+    message: str

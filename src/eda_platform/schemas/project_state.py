@@ -13,6 +13,10 @@ class Node(BaseModel):
     assigned_i2c_address: str | None = Field(
         default=None, description="Override I2C address in hex (e.g., 0x40)"
     )
+    selected_protocol: str | None = Field(
+        default=None,
+        description="Active communication protocol for this instance (e.g., I2C, SPI, PWM)",
+    )
 
     @field_validator("assigned_i2c_address")
     @classmethod

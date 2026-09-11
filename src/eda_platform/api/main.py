@@ -5,7 +5,14 @@ import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from eda_platform.api.routes import architect, firmware, manifests, operations, validate
+from eda_platform.api.routes import (
+    architect,
+    firmware,
+    librarian,
+    manifests,
+    operations,
+    validate,
+)
 
 app = FastAPI(
     title="EDA Platform API",
@@ -28,6 +35,7 @@ app.add_middleware(
 
 app.include_router(validate.router)
 app.include_router(manifests.router)
+app.include_router(librarian.router)
 app.include_router(architect.router)
 app.include_router(firmware.router)
 app.include_router(operations.router)

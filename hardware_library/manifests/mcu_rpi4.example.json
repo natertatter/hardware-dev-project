@@ -1,0 +1,77 @@
+{
+  "component_id": "mcu_rpi4",
+  "name": "Raspberry Pi 4",
+  "type": "MCU",
+  "power_requirements": {
+    "min_operating_voltage": 4.75,
+    "max_operating_voltage": 5.25,
+    "logic_level_voltage": 3.3,
+    "max_current_draw_ma": 2500.0
+  },
+  "default_protocol": "UART",
+  "protocol_profiles": {
+    "I2C": ["5V", "3V3", "GND", "GPIO2_I2C_SDA", "GPIO3_I2C_SCL"],
+    "UART": ["GND", "GPIO14_UART_TX", "GPIO15_UART_RX"],
+    "USB_SERIAL": ["GND", "USB_HOST"]
+  },
+  "pins": [
+    {
+      "pin_id": "5V",
+      "pin_type": "POWER",
+      "supported_features": [],
+      "max_current_source_ma": 500.0,
+      "internal_pullup_enabled": false,
+      "active_state": "NONE"
+    },
+    {
+      "pin_id": "3V3",
+      "pin_type": "POWER",
+      "supported_features": [],
+      "max_current_source_ma": 500.0,
+      "internal_pullup_enabled": false,
+      "active_state": "NONE"
+    },
+    {
+      "pin_id": "GND",
+      "pin_type": "GND",
+      "supported_features": [],
+      "internal_pullup_enabled": false,
+      "active_state": "NONE"
+    },
+    {
+      "pin_id": "GPIO2_I2C_SDA",
+      "pin_type": "I2C_SDA",
+      "supported_features": ["I2C"],
+      "internal_pullup_enabled": false,
+      "active_state": "NONE"
+    },
+    {
+      "pin_id": "GPIO3_I2C_SCL",
+      "pin_type": "I2C_SCL",
+      "supported_features": ["I2C"],
+      "internal_pullup_enabled": false,
+      "active_state": "NONE"
+    },
+    {
+      "pin_id": "GPIO14_UART_TX",
+      "pin_type": "UART_TX",
+      "supported_features": ["UART"],
+      "internal_pullup_enabled": false,
+      "active_state": "NONE"
+    },
+    {
+      "pin_id": "GPIO15_UART_RX",
+      "pin_type": "UART_RX",
+      "supported_features": ["UART"],
+      "internal_pullup_enabled": false,
+      "active_state": "NONE"
+    },
+    {
+      "pin_id": "USB_HOST",
+      "pin_type": "GPIO_OUT",
+      "supported_features": ["USB_SERIAL"],
+      "internal_pullup_enabled": false,
+      "active_state": "NONE"
+    }
+  ]
+}

@@ -166,6 +166,9 @@ export function compileProjectState(
       : node.data.manifest.default_i2c_address != null
         ? { assigned_i2c_address: node.data.manifest.default_i2c_address }
         : {}),
+    ...(node.data.selected_protocol != null
+      ? { selected_protocol: node.data.selected_protocol }
+      : {}),
   }));
 
   // Build ProjectState.nets from connected components

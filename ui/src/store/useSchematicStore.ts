@@ -15,6 +15,7 @@ import type { CatalogEntry, HardwareNodeData, ProjectState } from "@/types/schem
 import { useOperationsStore } from "@/store/useOperationsStore";
 import { compileProjectState } from "@/utils/compileProjectState";
 import { decompileProjectState } from "@/utils/decompileProjectState";
+import { defaultProtocol, pinsForProtocol } from "@/utils/protocolProfiles";
 
 export type ValidationStatus = "idle" | "validating" | "pass" | "fail" | "error";
 export type FirmwareStatus = "idle" | "generating" | "success" | "error";
@@ -47,6 +48,7 @@ interface SchematicState {
     onEdgesChange: (changes: EdgeChange[]) => void;
     onConnect: (connection: Connection) => void;
     addNodeFromCatalog: (entry: CatalogEntry) => void;
+    setNodeProtocol: (nodeId: string, protocol: string) => void;
     loadCatalog: () => Promise<void>;
     validateArchitecture: () => Promise<void>;
     autoWire: () => Promise<void>;
@@ -102,6 +104,11 @@ function placementOnlyProjectState(
         : node.data.manifest.default_i2c_address != null
           ? { assigned_i2c_address: node.data.manifest.default_i2c_address }
           : {}),
+      ...(node.data.selected_protocol != null
+        ? { selected_protocol: node.data.selected_protocol }
+        : defaultProtocol(node.data.manifest) != null
+          ? { selected_protocol: defaultProtocol(node.data.manifest) }
+          : {}),
     })),
     nets: [],
   };
@@ -149,6 +156,7 @@ export const useSchematicStore = create<SchematicState>((set, get) => ({
     },
     addNodeFromCatalog: (entry) => {
       nodeCounter += 1;
+      const proto = defaultProtocol(entry.manifest);
       const newNode: Node<HardwareNodeData> = {
         id: `node-${entry.manifest.component_id}-${nodeCounter}`,
         type: "hardware",
@@ -156,10 +164,38 @@ export const useSchematicStore = create<SchematicState>((set, get) => ({
         data: {
           label: entry.label,
           manifest: entry.manifest,
+          ...(proto != null ? { selected_protocol: proto } : {}),
         },
       };
       set({
         nodes: [...get().nodes, newNode],
+        ...resetWorkflowState(),
+      });
+    },
+    setNodeProtocol: (nodeId, protocol) => {
+      const { nodes, edges } = get();
+      const targetNode = nodes.find((n) => n.id === nodeId);
+      if (!targetNode) return;
+
+      const activePinIds = new Set(
+        pinsForProtocol(targetNode.data.manifest, protocol).map((p) => p.pin_id),
+      );
+
+      set({
+        nodes: nodes.map((node) =>
+          node.id === nodeId
+            ? { ...node, data: { ...node.data, selected_protocol: protocol } }
+            : node,
+        ),
+        edges: edges.filter((edge) => {
+          if (edge.source === nodeId && edge.sourceHandle && !activePinIds.has(edge.sourceHandle)) {
+            return false;
+          }
+          if (edge.target === nodeId && edge.targetHandle && !activePinIds.has(edge.targetHandle)) {
+            return false;
+          }
+          return true;
+        }),
         ...resetWorkflowState(),
       });
     },

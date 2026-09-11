@@ -29,6 +29,12 @@ export interface GenerateFirmwareResponse {
   message: string;
 }
 
+export interface UploadManifestResponse {
+  manifest: ComponentManifest;
+  saved_path: string;
+  message: string;
+}
+
 async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
     ...init,
@@ -150,4 +156,21 @@ export async function saveOperationsDraft(
     method: "POST",
     body: JSON.stringify({ operations }),
   });
+}
+
+export async function uploadDatasheet(file: File): Promise<UploadManifestResponse> {
+  const formData = new FormData();
+  formData.append("file", file);
+
+  const res = await fetch(`${API_BASE}/api/v1/librarian/upload`, {
+    method: "POST",
+    body: formData,
+  });
+
+  if (!res.ok) {
+    const detail = await res.text();
+    throw new Error(`Upload failed (${res.status}): ${detail}`);
+  }
+
+  return res.json() as Promise<UploadManifestResponse>;
 }
