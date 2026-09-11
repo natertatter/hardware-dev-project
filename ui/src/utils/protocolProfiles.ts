@@ -12,6 +12,8 @@ const SPI_PIN_TYPES: ReadonlySet<PinType> = new Set([
 const UART_PIN_TYPES: ReadonlySet<PinType> = new Set(["UART_TX", "UART_RX"]);
 const POWER_GND_TYPES: ReadonlySet<PinType> = new Set(["POWER", "GND"]);
 
+const PROTOCOL_ORDER = ["I2C", "SPI", "UART", "USB_SERIAL", "PWM", "GPIO"];
+
 function powerGndPinIds(manifest: ComponentManifest): string[] {
   return manifest.pins.filter((p) => POWER_GND_TYPES.has(p.pin_type)).map((p) => p.pin_id);
 }
@@ -71,7 +73,9 @@ export function deriveProtocolProfiles(manifest: ComponentManifest): Record<stri
 }
 
 export function availableProtocols(manifest: ComponentManifest): string[] {
-  return Object.keys(deriveProtocolProfiles(manifest)).sort();
+  return Object.keys(deriveProtocolProfiles(manifest)).sort(
+    (a, b) => PROTOCOL_ORDER.indexOf(a) - PROTOCOL_ORDER.indexOf(b),
+  );
 }
 
 export function defaultProtocol(manifest: ComponentManifest): string | null {

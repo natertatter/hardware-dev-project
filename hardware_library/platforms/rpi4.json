@@ -3,11 +3,16 @@
   "name": "Raspberry Pi 4",
   "i2c_device_path": "/dev/i2c-1",
   "i2c_bus_number": 1,
+  "uart_device_path": "/dev/serial0",
   "logical_pin_map": {
+    "GPIO2_I2C_SDA": 2,
+    "GPIO3_I2C_SCL": 3,
     "GPIO4": 2,
     "GPIO5": 3,
     "I2C_SDA": 2,
-    "I2C_SCL": 3
+    "I2C_SCL": 3,
+    "GPIO14_UART_TX": 14,
+    "GPIO15_UART_RX": 15
   },
-  "notes": "Enable I2C via raspi-config. Default bus maps schematic RP2040 GPIO4/5 to Pi header I2C1."
+  "notes": "Enable I2C via raspi-config. UART0 on GPIO14/15 (header pins 8/10). USB host port for Arduino USB-serial cable."
 }

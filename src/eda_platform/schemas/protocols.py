@@ -4,7 +4,7 @@ from eda_platform.schemas.component_manifest import ComponentManifest, Pin
 from eda_platform.schemas.enums import PinType
 
 # Canonical communication protocol identifiers used across UI and auto-wire.
-COMMUNICATION_PROTOCOLS = ("I2C", "SPI", "UART", "PWM", "GPIO")
+COMMUNICATION_PROTOCOLS = ("I2C", "SPI", "UART", "USB_SERIAL", "PWM", "GPIO")
 
 _I2C_PIN_TYPES = {PinType.I2C_SDA, PinType.I2C_SCL}
 _SPI_PIN_TYPES = {PinType.SPI_MOSI, PinType.SPI_MISO, PinType.SPI_SCK, PinType.SPI_CS}
