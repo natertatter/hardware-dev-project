@@ -4,7 +4,8 @@ from pathlib import Path
 
 from eda_platform.agents.firmware_engineer.codegen import templates
 from eda_platform.agents.firmware_engineer.models import SchedulingPlan
-from eda_platform.schemas import ComponentManifest, ComponentType, PinType, ProjectState
+from eda_platform.agents.operations_refiner.best_practices import is_boot_step
+from eda_platform.schemas import ComponentManifest, ComponentType, OperationsSequence, PinType, ProjectState
 
 
 def _node_address(node_id: str, project: ProjectState, manifest: ComponentManifest) -> int:
@@ -63,10 +64,35 @@ def _mcu_i2c_pins(
     return sda_pin_id, scl_pin_id
 
 
+def _boot_delays_from_operations(
+    operations: OperationsSequence | None,
+) -> list[tuple[int, str]]:
+    """One-shot delays to run sequentially in main() before threads spawn.
+
+    Only genuine boot/init steps qualify. A step with a one-shot delay that
+    is NOT part of boot (e.g. "pause before reversing motor direction",
+    an estop-release safety delay) describes a *runtime* pause that recurs
+    during normal operation — baking it into main()'s one-time startup
+    sequence would execute it once at boot and never again, silently
+    producing firmware that does not match the operations sequence.
+    """
+    if operations is None:
+        return []
+    delays: list[tuple[int, str]] = []
+    for step in operations.steps:
+        if not (step.timing and step.timing.delay_ms):
+            continue
+        if not is_boot_step(step.description):
+            continue
+        delays.append((step.timing.delay_ms, step.description))
+    return delays
+
+
 def generate_source_files(
     project: ProjectState,
     manifests: dict[str, ComponentManifest],
     plan: SchedulingPlan,
+    operations: OperationsSequence | None = None,
 ) -> dict[str, str]:
     """Return relative path → file contents for the full firmware tree."""
     sensors = _sensor_nodes(plan, project, manifests)
@@ -84,7 +110,9 @@ def generate_source_files(
 
     files["tasks/task_sensor_poll.c"] = templates.task_sensor_poll_c(sensors)
     files["tasks/task_background.c"] = templates.task_background_c()
-    files["main.c"] = templates.main_c(plan, sensors)
+    files["main.c"] = templates.main_c(
+        plan, sensors, boot_delays=_boot_delays_from_operations(operations)
+    )
     files["Makefile"] = templates.makefile(project.project_id, sensors)
 
     return files
@@ -95,9 +123,10 @@ def emit_firmware_tree(
     project: ProjectState,
     manifests: dict[str, ComponentManifest],
     plan: SchedulingPlan,
+    operations: OperationsSequence | None = None,
 ) -> list[str]:
     """Write generated files to disk; return list of relative paths written."""
-    files = generate_source_files(project, manifests, plan)
+    files = generate_source_files(project, manifests, plan, operations=operations)
     written: list[str] = []
 
     for rel_path, content in files.items():

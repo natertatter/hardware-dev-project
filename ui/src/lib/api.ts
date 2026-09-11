@@ -1,6 +1,6 @@
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
-import type { ComponentManifest, ProjectState } from "@/types/schemas";
+import type { ComponentManifest, OperationsSequence, ProjectState } from "@/types/schemas";
 
 export interface ValidationIssue {
   rule: string;
@@ -77,11 +77,84 @@ export async function autoWireProjectState(
 
 export async function generateFirmware(
   projectState: ProjectState,
-  approved: boolean
+  approved: boolean,
+  operations?: OperationsSequence | null,
+  operationsApproved?: boolean,
 ): Promise<GenerateFirmwareResponse> {
   return apiFetch<GenerateFirmwareResponse>("/api/v1/firmware/generate", {
     method: "POST",
-    body: JSON.stringify({ project_state: projectState, approved }),
+    body: JSON.stringify({
+      project_state: projectState,
+      approved,
+      operations: operations ?? null,
+      operations_approved: operationsApproved ?? false,
+    }),
+  });
+}
+
+export interface RefineOperationsResponse {
+  refined: OperationsSequence;
+  fidelity_promoted: boolean;
+  previous_fidelity: string;
+  steps_bound: number;
+  questions_added: number;
+  warnings: string[];
+}
+
+export interface OperationsValidationIssue {
+  rule: string;
+  severity: string;
+  message: string;
+  step_id?: string | null;
+  node_id?: string | null;
+}
+
+export interface ValidateOperationsResponse {
+  valid: boolean;
+  errors: OperationsValidationIssue[];
+}
+
+export async function refineOperations(
+  operations: OperationsSequence,
+  projectState: ProjectState,
+): Promise<RefineOperationsResponse> {
+  return apiFetch<RefineOperationsResponse>("/api/v1/operations/refine", {
+    method: "POST",
+    body: JSON.stringify({ operations, project_state: projectState, persist: false }),
+  });
+}
+
+export async function validateOperations(
+  operations: OperationsSequence,
+  projectState: ProjectState,
+): Promise<ValidateOperationsResponse> {
+  return apiFetch<ValidateOperationsResponse>("/api/v1/operations/validate", {
+    method: "POST",
+    body: JSON.stringify({ operations, project_state: projectState }),
+  });
+}
+
+export async function mergeOperations(
+  operations: OperationsSequence,
+  projectState?: ProjectState,
+): Promise<{ master: OperationsSequence; message: string }> {
+  return apiFetch("/api/v1/operations/merge", {
+    method: "POST",
+    body: JSON.stringify({
+      operations,
+      project_state: projectState ?? null,
+      bump_version: true,
+    }),
+  });
+}
+
+export async function saveOperationsDraft(
+  projectId: string,
+  operations: OperationsSequence,
+): Promise<{ saved_path: string }> {
+  return apiFetch(`/api/v1/projects/${projectId}/operations/drafts`, {
+    method: "POST",
+    body: JSON.stringify({ operations }),
   });
 }
 

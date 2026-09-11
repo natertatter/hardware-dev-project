@@ -42,12 +42,19 @@ export interface Pin {
   active_state?: ActiveState;
 }
 
+export interface OperationalConstraints {
+  power_on_delay_ms?: number | null;
+  conversion_time_ms?: number | null;
+  i2c_max_clock_hz?: number | null;
+}
+
 export interface ComponentManifest {
   component_id: string;
   name: string;
   type: ComponentType;
   power_requirements: PowerRequirements;
   default_i2c_address?: string | null;
+  operational_constraints?: OperationalConstraints | null;
   default_protocol?: string | null;
   protocol_profiles?: Record<string, string[]> | null;
   pins: Pin[];
@@ -91,3 +98,45 @@ export interface HardwareNodeData {
   label?: string;
   [key: string]: unknown;
 }
+
+export type FidelityLevel = "narrative" | "steps" | "timed" | "executable";
+
+export type ProvenanceSource = "human" | "datasheet" | "best_practice" | "inferred";
+
+export type ExecutionTier = "T0" | "T1" | "T2" | "T3";
+
+export interface TimingConstraint {
+  delay_ms?: number | null;
+  period_ms?: number | null;
+  source?: ProvenanceSource;
+  note?: string | null;
+}
+
+export interface OpenQuestion {
+  question_id: string;
+  related_step_id?: string | null;
+  text: string;
+}
+
+export interface OperationStep {
+  step_id: string;
+  description: string;
+  target_node_id?: string | null;
+  hal_call?: string | null;
+  tier?: ExecutionTier | null;
+  timing?: TimingConstraint | null;
+  condition?: string | null;
+  depends_on?: string[];
+  needs_refinement?: boolean;
+  provenance?: ProvenanceSource;
+}
+
+export interface OperationsSequence {
+  project_id: string;
+  fidelity: FidelityLevel;
+  version: number;
+  narrative?: string | null;
+  steps: OperationStep[];
+  open_questions: OpenQuestion[];
+}
+

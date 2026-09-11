@@ -1,4 +1,4 @@
-import { describe, expect, it, beforeEach } from "vitest";
+import { describe, expect, it, beforeEach, vi } from "vitest";
 
 import { COMPONENT_CATALOG } from "@/data/mockCatalog";
 import { useSchematicStore } from "@/store/useSchematicStore";
@@ -14,6 +14,7 @@ describe("useSchematicStore", () => {
       })),
       catalogLoaded: true,
       catalogError: null,
+      catalogSource: "api",
       validationStatus: "idle",
       validationIssues: [],
       validationMessage: null,
@@ -59,5 +60,25 @@ describe("useSchematicStore", () => {
     const state = useSchematicStore.getState();
     expect(state.autoWireStatus).toBe("error");
     expect(state.autoWireMessage).toMatch(/catalog is empty/i);
+  });
+
+  it("falls back to the built-in catalog when the API is unavailable", async () => {
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = vi.fn().mockRejectedValue(new Error("Failed to fetch"));
+    useSchematicStore.setState({
+      catalog: [],
+      catalogLoaded: false,
+      catalogError: null,
+      catalogSource: null,
+    });
+    await useSchematicStore.getState().actions.loadCatalog();
+
+    const state = useSchematicStore.getState();
+    expect(state.catalogLoaded).toBe(true);
+    expect(state.catalogError).toBeNull();
+    expect(state.catalogSource).toBe("mock");
+    expect(state.catalog.length).toBeGreaterThan(0);
+
+    globalThis.fetch = originalFetch;
   });
 });

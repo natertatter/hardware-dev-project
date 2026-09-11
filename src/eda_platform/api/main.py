@@ -5,12 +5,19 @@ import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from eda_platform.api.routes import architect, firmware, librarian, manifests, validate
+from eda_platform.api.routes import (
+    architect,
+    firmware,
+    librarian,
+    manifests,
+    operations,
+    validate,
+)
 
 app = FastAPI(
     title="EDA Platform API",
     description="Validation, manifest catalog, template layout, and firmware generation",
-    version="0.3.0",
+    version="0.4.0",
 )
 
 _cors_origins = os.getenv(
@@ -31,6 +38,7 @@ app.include_router(manifests.router)
 app.include_router(librarian.router)
 app.include_router(architect.router)
 app.include_router(firmware.router)
+app.include_router(operations.router)
 
 
 @app.get("/health")

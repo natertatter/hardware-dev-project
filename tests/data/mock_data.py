@@ -4,6 +4,7 @@ from eda_platform.schemas import (
     ActiveState,
     ComponentManifest,
     ComponentType,
+    OperationalConstraints,
     Pin,
     PinType,
     PowerRequirements,
@@ -124,6 +125,11 @@ def ina219_manifest() -> ComponentManifest:
             max_current_draw_ma=1.0,
         ),
         default_i2c_address="0x40",
+        operational_constraints=OperationalConstraints(
+            power_on_delay_ms=100,
+            conversion_time_ms=20,
+            i2c_max_clock_hz=400000,
+        ),
         pins=[
             Pin(pin_id="VCC", pin_type=PinType.POWER),
             Pin(pin_id="GND", pin_type=PinType.GND),

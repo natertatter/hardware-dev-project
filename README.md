@@ -4,9 +4,9 @@ Multi-agent swarm for robotics hardware design: datasheet ingestion → schemati
 
 ## Architecture
 
-- **Agents:** Hardware Librarian, Systems Architect, Logic Checker, Firmware Engineer
-- **Lingua franca:** `ComponentManifest` and `ProjectState` JSON schemas (Pydantic-validated)
-- **Docs:** See `docs/architecture/FOLDER_STRUCTURE.md` and `docs/firmware/CONCURRENCY_STRATEGY.md`
+- **Agents:** Hardware Librarian, Systems Architect, Logic Checker, Operations Refiner, Operations Checker, Firmware Engineer
+- **Lingua franca:** `ComponentManifest`, `ProjectState`, and `OperationsSequence` JSON schemas (Pydantic-validated)
+- **Docs:** See `docs/architecture/FOLDER_STRUCTURE.md`, `docs/architecture/OPERATIONS_SEQUENCE.md`, and `docs/firmware/CONCURRENCY_STRATEGY.md`
 
 ## Quick Start
 
@@ -46,6 +46,13 @@ npm run test       # net compiler + store unit tests
 | POST | `/api/v1/validate` | Run Logic Checker on `ProjectState` |
 | POST | `/api/v1/architect/auto-wire` | Template I2C auto-wiring |
 | POST | `/api/v1/firmware/generate` | Generate pthreads C firmware for Raspberry Pi 4 |
+| GET | `/api/v1/projects/{id}/operations/master` | Load master operations sequence |
+| PUT | `/api/v1/projects/{id}/operations/master` | Save master operations sequence |
+| POST | `/api/v1/projects/{id}/operations/drafts` | Capture vibe/draft input |
+| POST | `/api/v1/operations/refine` | Refine operations against schematic + manifests |
+| POST | `/api/v1/operations/validate` | Validate operations sequence |
+| POST | `/api/v1/operations/merge` | Promote refined sequence to master |
+| POST | `/api/v1/operations/generate-docs` | Generate operating procedure + bring-up checklist |
 
 See `docs/architecture/ENGINEERING_DECISIONS.md` for Phase 4–8 design rationale.
 

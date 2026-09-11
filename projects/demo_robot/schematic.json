@@ -1,0 +1,48 @@
+{
+  "project_id": "demo_robot",
+  "nodes": [
+    {
+      "node_id": "mcu_1",
+      "component_id": "mcu_rp2040"
+    },
+    {
+      "node_id": "sensor_1",
+      "component_id": "sens_ina219",
+      "assigned_i2c_address": "0x40"
+    }
+  ],
+  "nets": [
+    {
+      "net_id": "net_vcc",
+      "net_type": "POWER",
+      "connections": [
+        { "node_id": "mcu_1", "pin_id": "3V3_OUT" },
+        { "node_id": "sensor_1", "pin_id": "VCC" }
+      ]
+    },
+    {
+      "net_id": "net_gnd",
+      "net_type": "GND",
+      "connections": [
+        { "node_id": "mcu_1", "pin_id": "GND" },
+        { "node_id": "sensor_1", "pin_id": "GND" }
+      ]
+    },
+    {
+      "net_id": "net_i2c_sda",
+      "net_type": "BUS",
+      "connections": [
+        { "node_id": "mcu_1", "pin_id": "GPIO4" },
+        { "node_id": "sensor_1", "pin_id": "I2C_SDA" }
+      ]
+    },
+    {
+      "net_id": "net_i2c_scl",
+      "net_type": "BUS",
+      "connections": [
+        { "node_id": "mcu_1", "pin_id": "GPIO5" },
+        { "node_id": "sensor_1", "pin_id": "I2C_SCL" }
+      ]
+    }
+  ]
+}
