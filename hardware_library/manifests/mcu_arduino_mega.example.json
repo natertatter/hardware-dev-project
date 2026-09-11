@@ -1,0 +1,69 @@
+{
+  "component_id": "mcu_arduino_mega",
+  "name": "Arduino Mega 2560",
+  "type": "MCU",
+  "power_requirements": {
+    "min_operating_voltage": 7.0,
+    "max_operating_voltage": 12.0,
+    "logic_level_voltage": 5.0,
+    "max_current_draw_ma": 200.0
+  },
+  "default_protocol": "UART",
+  "protocol_profiles": {
+    "UART": ["GND", "D0_RX", "D1_TX"],
+    "USB_SERIAL": ["GND", "USB_DEVICE"]
+  },
+  "pins": [
+    {
+      "pin_id": "VIN",
+      "pin_type": "POWER",
+      "supported_features": [],
+      "internal_pullup_enabled": false,
+      "active_state": "NONE"
+    },
+    {
+      "pin_id": "5V",
+      "pin_type": "POWER",
+      "supported_features": [],
+      "max_current_source_ma": 500.0,
+      "internal_pullup_enabled": false,
+      "active_state": "NONE"
+    },
+    {
+      "pin_id": "3V3",
+      "pin_type": "POWER",
+      "supported_features": [],
+      "max_current_source_ma": 50.0,
+      "internal_pullup_enabled": false,
+      "active_state": "NONE"
+    },
+    {
+      "pin_id": "GND",
+      "pin_type": "GND",
+      "supported_features": [],
+      "internal_pullup_enabled": false,
+      "active_state": "NONE"
+    },
+    {
+      "pin_id": "D0_RX",
+      "pin_type": "UART_RX",
+      "supported_features": ["UART"],
+      "internal_pullup_enabled": false,
+      "active_state": "NONE"
+    },
+    {
+      "pin_id": "D1_TX",
+      "pin_type": "UART_TX",
+      "supported_features": ["UART"],
+      "internal_pullup_enabled": false,
+      "active_state": "NONE"
+    },
+    {
+      "pin_id": "USB_DEVICE",
+      "pin_type": "GPIO_IN",
+      "supported_features": ["USB_SERIAL"],
+      "internal_pullup_enabled": false,
+      "active_state": "NONE"
+    }
+  ]
+}

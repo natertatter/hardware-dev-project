@@ -12,6 +12,7 @@ import {
 import { useCallback, useEffect } from "react";
 
 import { HardwareNode } from "@/components/HardwareNode";
+import { DatasheetUpload } from "@/components/DatasheetUpload";
 import { ValidationPanel } from "@/components/ValidationPanel";
 import { useSchematicStore } from "@/store/useSchematicStore";
 
@@ -109,9 +110,10 @@ function SchematicCanvas() {
 
       <div className="editor-shell__body">
         <aside className="schematic-editor__sidebar">
+          <DatasheetUpload />
           <h2 className="schematic-editor__title">Parts Library</h2>
           <p className="schematic-editor__hint">
-            Click a module to place it on the drafting table. Orthogonal traces only.
+            Click a module to place it on the drafting table. Use the protocol switch on multi-bus parts.
           </p>
           {!catalogLoaded && !catalogError ? (
             <p className="schematic-editor__hint">Loading catalog…</p>

@@ -655,3 +655,88 @@ body {
   opacity: 0.25;
   font-size: 0.5625rem;
 }
+
+/* ── Protocol selector on hardware nodes ───────────────────────────────── */
+
+.protocol-selector {
+  padding: 0.375rem 0.75rem;
+  border-bottom: 1px solid var(--lab-border);
+  background: rgba(37, 99, 235, 0.06);
+}
+
+.protocol-selector__label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font-size: 0.625rem;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.protocol-selector__select {
+  flex: 1;
+  max-width: 7rem;
+  padding: 0.2rem 0.4rem;
+  font-size: 0.6875rem;
+  font-family: var(--font-mono);
+  color: var(--text-primary);
+  background: var(--lab-bg);
+  border: 1px solid var(--lab-border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.protocol-selector__select:focus {
+  outline: none;
+  border-color: var(--pop-blue);
+}
+
+/* ── Datasheet upload dropzone ─────────────────────────────────────────── */
+
+.datasheet-upload {
+  margin-bottom: 1.25rem;
+  padding-bottom: 1.25rem;
+  border-bottom: 1px solid var(--lab-border);
+}
+
+.datasheet-upload__title {
+  margin: 0 0 0.375rem;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-secondary);
+}
+
+.datasheet-upload__dropzone {
+  margin-top: 0.5rem;
+  padding: 1rem;
+  border: 1px dashed var(--lab-border-light);
+  border-radius: var(--radius-sm);
+  background: var(--lab-bg);
+  text-align: center;
+  cursor: pointer;
+  transition: border-color var(--transition), background var(--transition);
+}
+
+.datasheet-upload__dropzone:hover {
+  border-color: var(--pop-orange);
+  background: rgba(255, 87, 34, 0.04);
+}
+
+.datasheet-upload__input {
+  display: none;
+}
+
+.datasheet-upload__prompt {
+  font-size: 0.6875rem;
+  color: var(--text-muted);
+}
+
+.panel-card__message--success {
+  color: var(--pop-green);
+  font-size: 0.6875rem;
+  margin-top: 0.5rem;
+}
