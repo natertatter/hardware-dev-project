@@ -17,6 +17,8 @@ jobs:
         run: pip install -e ".[dev]"
       - name: pytest
         run: pytest
+      - name: Horizon A host verify
+        run: python3 scripts/horizon_a_verify.py --write-firmware
 
   ui:
     runs-on: ubuntu-latest

@@ -129,9 +129,32 @@ Add manifests by dropping JSON into `manifests/` or using **Datasheet upload** i
 
 ## Tests
 
+### Automated loop (host — no Raspberry Pi)
+
+Run this after code changes or before opening a PR:
+
 ```bash
-python3 -m pytest -q          # backend
-cd ui && npm run test           # frontend (vitest)
+pip install -e ".[dev]"
+python3 -m pytest -q
+cd ui && npm install && npm run test
+python3 scripts/horizon_a_verify.py              # validate-only
+python3 scripts/horizon_a_verify.py --write-firmware   # + generate & make
 ```
 
-Counts change as tests are added; CI automation is planned (roadmap **A4**).
+GitHub Actions runs the same backend, UI, and `horizon_a_verify` steps on every PR.
+
+Optional — with API already running (`docker compose up` or `uvicorn …`):
+
+```bash
+python3 scripts/horizon_a_verify.py --live-api http://localhost:8000
+```
+
+### Cloud Agent / remote dev VM
+
+This repository’s Cloud Agent image can run the **host loop** above (pytest, vitest, `horizon_a_verify`). It does **not** include a Raspberry Pi; use [`firmware/PI4_HARDWARE_SMOKE.md`](firmware/PI4_HARDWARE_SMOKE.md) on real hardware after copying `generated/firmware/<project_id>/` to the board.
+
+For interactive UI testing in a remote environment, expose ports **3000** (UI) and **8000** (API) from `docker compose up` or run `npm run dev` + `uvicorn` and open the forwarded URLs shown in the agent dashboard.
+
+### Raspberry Pi hardware
+
+See **[`firmware/PI4_HARDWARE_SMOKE.md`](firmware/PI4_HARDWARE_SMOKE.md)** for wiring, `i2cdetect`, and `scripts/pi4_on_device_smoke.sh` on the device.

@@ -33,7 +33,7 @@ Last reviewed: 2026-09-12 (post-merge of operations + datasheet/protocol stacks 
 | A2 | Documentation alignment | **Done** — HOW_TO, API, Compose notes updated |
 | A3 | Docker persistence | **Done** — `projects/` and `generated/` mounted in Compose |
 | A4 | CI baseline | **Done** — `.github/workflows/ci.yml` |
-| A5 | Pi hardware smoke | Scripted or checklist validation on real board |
+| A5 | Pi hardware smoke | **Done** — [`docs/firmware/PI4_HARDWARE_SMOKE.md`](firmware/PI4_HARDWARE_SMOKE.md), `scripts/horizon_a_verify.py`, `scripts/pi4_on_device_smoke.sh` |
 
 ---
 
@@ -97,8 +97,8 @@ Authentication, multi-project tenancy, hosted deploy (TLS), pipeline observabili
 
 ## Suggested order
 
-1. **A1, A4, A2** (persistence, CI, docs)
-2. **A5** (hardware proof)
+1. ~~**A1, A4, A2** (persistence, CI, docs)~~ — complete
+2. ~~**A5** (hardware proof)~~ — host script + Pi checklist complete
 3. **B1, B3** (executable ops + docs UX)
 4. **C1** (Librarian v2)
 5. **E1** (motors on Pi)
