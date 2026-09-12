@@ -185,3 +185,27 @@ class ProjectMetadataResponse(BaseModel):
 
 class SaveProjectMetadataRequest(BaseModel):
     metadata: ProjectMetadata
+
+
+class PipelineRunRequest(BaseModel):
+    project_state: ProjectState
+    schematic_approved: bool = Field(
+        ..., description="Must be true to generate firmware"
+    )
+    operations: OperationsSequence | None = None
+    operations_approved: bool = False
+    manifests: dict[str, ComponentManifest] | None = None
+
+
+class PipelineStageResult(BaseModel):
+    stage: str
+    success: bool
+    message: str
+
+
+class PipelineRunResponse(BaseModel):
+    success: bool
+    message: str
+    stages: list[PipelineStageResult]
+    firmware_output_dir: str | None = None
+    firmware_files_written: list[str] = Field(default_factory=list)

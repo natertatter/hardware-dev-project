@@ -54,7 +54,7 @@ Vibe/draft input
     → Operations Checker (cross-check vs ProjectState, manifests, scheduling plan)
     → Refined output (for human review)
     → Merge into master.json (on approval)
-    → Firmware Engineer (boot/init delays + operating docs today; runtime executable ops — see [`ROADMAP.md`](../ROADMAP.md) Horizon B)
+    → Firmware Engineer (boot/init delays, operating docs, runtime ops interpreter when fidelity is timed/executable)
 ```
 
 ### Operations Refiner (`src/eda_platform/agents/operations_refiner/`)
@@ -98,6 +98,7 @@ Mirrors Logic Checker pattern: individual rules + `validate_operations_collect()
 | POST | `/api/v1/operations/merge` | Promote refined → master (with version bump) |
 | POST | `/api/v1/operations/generate-docs` | Markdown operating procedure + bring-up checklist |
 | POST | `/api/v1/projects/{id}/operations/approve` | Persist operations approval in project metadata |
+| POST | `/api/v1/pipeline/run` | Staged schematic validate → ops gates → firmware generate |
 
 Full request/response detail: [`API.md`](API.md).
 
@@ -135,8 +136,9 @@ The original phased plan (foundation → UI → librarian timing → firmware/do
 | Manifest timing + `OperationalConstraints` | Shipped |
 | Boot delays in generated `main.c` + operating markdown | Shipped |
 | Optional LLM narrative refine (Anthropic BYOK) | Shipped |
-
-**Not yet shipped:** embedding **runtime** executable operations in generated firmware (only boot/init one-shot delays). Planned under [`ROADMAP.md`](../ROADMAP.md) Horizon B.
+| Runtime ops interpreter (`runtime/ops_interpreter`, poll hook) | Shipped (Horizon B1) |
+| Codegen fidelity gates for `executable` | Shipped (Horizon B2) |
+| Staged `POST /pipeline/run` orchestration | Shipped (Horizon B4) |
 
 ## Cursor Workflow (end-to-end)
 

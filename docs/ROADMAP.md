@@ -2,7 +2,7 @@
 
 Living plan for the EDA platform. **Implementation status** for the operations sequence system is recorded in [`docs/architecture/OPERATIONS_SEQUENCE.md`](architecture/OPERATIONS_SEQUENCE.md). **HTTP contracts** are in [`docs/architecture/API.md`](architecture/API.md).
 
-Last reviewed: 2026-09-12 (Horizon A review fixes: project id validation, draft-on-disk schematics, approval contract).
+Last reviewed: 2026-09-12 (Horizon B: runtime ops interpreter, fidelity gates, docs UX, pipeline API).
 
 ---
 
@@ -15,7 +15,7 @@ Last reviewed: 2026-09-12 (Horizon A review fixes: project id validation, draft-
 | Systems Architect | v1 | Deterministic template auto-wire (I2C bus, multi-MCU UART/USB serial) |
 | Hardware Librarian | v1 | Upload JSON or PDF; PDF → template manifest (full LLM extraction not yet) |
 | Operations | v1 | Refiner, checker, API, UI panel, optional LLM, operating docs |
-| Firmware Engineer | v1 (Pi 4) | pthreads + I2C sensors; boot delays from operations; runtime executable ops not yet |
+| Firmware Engineer | v1 (Pi 4) | pthreads + I2C sensors; boot delays + runtime ops interpreter for timed/executable sequences |
 | UI | v1 | React Flow editor, catalog, protocols, datasheet upload, operations sidebar |
 | CI / deploy | v1 | Docker Compose with `projects/` + `generated/` mounts; GitHub Actions runs `pytest` and UI `vitest` |
 
@@ -43,10 +43,10 @@ Last reviewed: 2026-09-12 (Horizon A review fixes: project id validation, draft-
 
 | ID | Work | Done when |
 |----|------|-----------|
-| B1 | Runtime operations interpreter | Recurring / non-boot steps map to tasks or state machine |
-| B2 | Codegen fidelity gates | Refuse or degrade codegen when open questions block `executable` |
-| B3 | Operating docs in UI | Surface `generate-docs` output beside firmware success |
-| B4 | Orchestration endpoint | Single staged run: validate schematic → refine/validate ops → generate |
+| B1 | Runtime operations interpreter | **Done** — `operations_runtime.py`, emitted `runtime/ops_interpreter` + `task_operations_runtime` |
+| B2 | Codegen fidelity gates | **Done** — `runner.py` blocks `executable` when open questions or `needs_refinement` |
+| B3 | Operating docs in UI | **Done** — post-firmware `generate-docs` preview in Validation panel |
+| B4 | Orchestration endpoint | **Done** — `POST /api/v1/pipeline/run`, `run_staged_pipeline()` |
 
 ---
 
@@ -99,7 +99,7 @@ Authentication, multi-project tenancy, hosted deploy (TLS), pipeline observabili
 
 1. ~~**A1, A4, A2** (persistence, CI, docs)~~ — complete
 2. ~~**A5** (hardware proof)~~ — host script + Pi checklist complete
-3. **B1, B3** (executable ops + docs UX)
+3. ~~**B1, B3** (executable ops + docs UX)~~ — complete (B2, B4 included)
 4. **C1** (Librarian v2)
 5. **E1** (motors on Pi)
 6. **D2 / D3**, then **E3**

@@ -1,6 +1,7 @@
 """C code templates for Raspberry Pi 4 pthreads firmware."""
 
 from eda_platform.agents.firmware_engineer.models import SchedulingPlan
+from eda_platform.agents.firmware_engineer.operations_runtime import RuntimePlan
 from eda_platform.agents.firmware_engineer.pin_map import (
     I2C_BUS_NUMBER,
     I2C_DEVICE_PATH,
@@ -177,7 +178,63 @@ int {hal}_read_current_ma(float *current_ma) {{
 """
 
 
-def task_sensor_poll_c(sensors: list[dict]) -> str:
+def ops_interpreter_h() -> str:
+    return """/* Operations sequence runtime interpreter (generated) */
+#ifndef OPS_INTERPRETER_H
+#define OPS_INTERPRETER_H
+
+void ops_runtime_run_startup_sequence(void);
+void ops_runtime_on_poll_tick(void);
+
+#endif
+"""
+
+
+def ops_interpreter_c(plan: RuntimePlan) -> str:
+    startup_lines = ""
+    for step in plan.startup_delays:
+        safe = step.description.replace('"', "'")
+        startup_lines += (
+            f'    printf("[runtime] {step.step_id}: {safe} ({step.delay_ms} ms)\\n");\n'
+            f"    usleep({step.delay_ms * 1000});\n"
+        )
+    poll_lines = ""
+    for step in plan.periodic_steps:
+        safe = step.description.replace('"', "'")
+        poll_lines += f'    printf("[runtime] {step.step_id}: {safe}\\n");\n'
+
+    return f"""/* Operations sequence runtime interpreter (generated) */
+#include <stdio.h>
+#include <unistd.h>
+
+#include "ops_interpreter.h"
+
+void ops_runtime_run_startup_sequence(void) {{
+{startup_lines or "    /* no startup runtime delays */"}
+}}
+
+void ops_runtime_on_poll_tick(void) {{
+{poll_lines or "    /* no periodic runtime steps */"}
+}}
+"""
+
+
+def task_operations_runtime_c(plan: RuntimePlan) -> str:
+    return f"""/* Auto-generated runtime operations task (non-boot delays) */
+#include <pthread.h>
+#include <stdio.h>
+
+#include "../runtime/ops_interpreter.h"
+
+void *task_operations_runtime(void *arg) {{
+    (void)arg;
+    ops_runtime_run_startup_sequence();
+    return NULL;
+}}
+"""
+
+
+def task_sensor_poll_c(sensors: list[dict], *, include_runtime_tick: bool = False) -> str:
     inits = "\n    ".join(f"{s['hal_module']}_init();" for s in sensors)
     reads = "\n        ".join(
         f'float {s["node_id"]}_ma = 0.0f;\n        '
@@ -195,6 +252,7 @@ def task_sensor_poll_c(sensors: list[dict]) -> str:
 #include "../platform/board_config.h"
 #include "../hal/hal_i2c_bus_0.h"
 {chr(10).join(f'#include "../hal/{s["hal_module"]}.h"' for s in sensors)}
+{"#include \"../runtime/ops_interpreter.h\"" if include_runtime_tick else ""}
 
 void *task_sensor_poll(void *arg) {{
     (void)arg;
@@ -213,6 +271,7 @@ void *task_sensor_poll(void *arg) {{
             continue; /* interrupted or spurious wakeup — try again next period */
         }}
         {reads}
+{"        ops_runtime_on_poll_tick();" if include_runtime_tick else ""}
     }}
     return NULL;
 }}
@@ -240,6 +299,7 @@ def main_c(
     plan: SchedulingPlan,
     sensors: list[dict],
     boot_delays: list[tuple[int, str]] | None = None,
+    spawn_operations_runtime: list | None = None,
 ) -> str:
     has_sensor_poll = any(t.task_id == "task_sensor_poll" for t in plan.tasks)
     has_background = any(t.task_id == "task_background" for t in plan.tasks)
@@ -255,6 +315,15 @@ def main_c(
     background_extern = "    extern void *task_background(void *);" if has_background else ""
     background_spawn = (
         '    spawn_thread(task_background, "task_background");' if has_background else ""
+    )
+    has_ops_runtime = bool(spawn_operations_runtime)
+    ops_runtime_extern = (
+        "    extern void *task_operations_runtime(void *);" if has_ops_runtime else ""
+    )
+    ops_runtime_spawn = (
+        '    spawn_thread(task_operations_runtime, "task_operations_runtime");'
+        if has_ops_runtime
+        else ""
     )
 
     boot_lines = ""
@@ -304,6 +373,8 @@ int main(void) {{
 {sensor_poll_spawn}
 {background_extern}
 {background_spawn}
+{ops_runtime_extern}
+{ops_runtime_spawn}
 
     /* Thin supervisor — no hardware logic in main */
     for (;;) {{
@@ -315,14 +386,23 @@ int main(void) {{
 """
 
 
-def makefile(project_id: str, sensors: list[dict]) -> str:
+def makefile(
+    project_id: str, sensors: list[dict], *, include_operations_runtime: bool = False
+) -> str:
     hal_objs = " ".join(f"hal/{s['hal_module']}.o" for s in sensors)
+    runtime_objs = ""
+    runtime_rules = ""
+    if include_operations_runtime:
+        runtime_objs = " runtime/ops_interpreter.o tasks/task_operations_runtime.o"
+        runtime_rules = """
+runtime/ops_interpreter.o: runtime/ops_interpreter.c runtime/ops_interpreter.h
+tasks/task_operations_runtime.o: tasks/task_operations_runtime.c runtime/ops_interpreter.h"""
     return f"""# Auto-generated Makefile for {project_id} on Raspberry Pi 4
 CC = gcc
 CFLAGS = -Wall -Wextra -O2 -pthread -I.
 LDFLAGS = -pthread
 
-OBJS = main.o hal/hal_i2c_bus_0.o tasks/task_sensor_poll.o tasks/task_background.o {hal_objs}
+OBJS = main.o hal/hal_i2c_bus_0.o tasks/task_sensor_poll.o tasks/task_background.o{runtime_objs} {hal_objs}
 
 TARGET = {project_id}_firmware
 
@@ -335,6 +415,7 @@ main.o: main.c platform/board_config.h
 hal/hal_i2c_bus_0.o: hal/hal_i2c_bus_0.c hal/hal_i2c_bus_0.h
 tasks/task_sensor_poll.o: tasks/task_sensor_poll.c
 tasks/task_background.o: tasks/task_background.c
+{runtime_rules}
 {chr(10).join(f"hal/{s['hal_module']}.o: hal/{s['hal_module']}.c hal/{s['hal_module']}.h" for s in sensors)}
 
 clean:

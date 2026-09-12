@@ -94,3 +94,6 @@ class TestFirmwareWithOperations:
         assert "usleep(1000000)" not in main_c, (
             "estop-release runtime delay must not be baked into the one-time boot sequence"
         )
+        runtime_c = (tmp_path / "valid_i2c_wiring" / "runtime" / "ops_interpreter.c").read_text()
+        assert "usleep(500000)" in runtime_c
+        assert "usleep(1000000)" in runtime_c
