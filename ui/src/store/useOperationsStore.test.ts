@@ -7,6 +7,7 @@ vi.mock("@/lib/api", () => ({
   mergeOperations: vi.fn(),
 }));
 
+import { DEFAULT_PROJECT_ID } from "@/constants/project";
 import { saveOperationsDraft, refineOperations } from "@/lib/api";
 import { useOperationsStore } from "@/store/useOperationsStore";
 import { useSchematicStore } from "@/store/useSchematicStore";
@@ -36,7 +37,7 @@ function placedNode(id: string) {
 describe("useOperationsStore", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    useSchematicStore.setState({ nodes: [], edges: [] });
+    useSchematicStore.setState({ nodes: [], edges: [], projectId: DEFAULT_PROJECT_ID });
     useOperationsStore.setState({
       narrative: "",
       sequence: null,
@@ -66,13 +67,13 @@ describe("useOperationsStore", () => {
 
       expect(saveOperationsDraft).toHaveBeenCalledTimes(1);
       const [projectId, draft] = (saveOperationsDraft as any).mock.calls[0];
-      expect(projectId).toBe("schematic_project");
+      expect(projectId).toBe(DEFAULT_PROJECT_ID);
       expect(draft.narrative).toBe("Enable power rail.");
       expect(useOperationsStore.getState().operationsMessage).toBe("Draft captured.");
     });
 
     it("reports a clear message instead of throwing when no nodes are placed", async () => {
-      useSchematicStore.setState({ nodes: [], edges: [] });
+      useSchematicStore.setState({ nodes: [], edges: [], projectId: DEFAULT_PROJECT_ID });
       useOperationsStore.setState({ narrative: "Enable power rail." });
 
       await expect(

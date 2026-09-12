@@ -10,7 +10,9 @@ import {
   ReactFlowProvider,
   useReactFlow,
 } from "@xyflow/react";
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+
+import { DEFAULT_PROJECT_ID } from "@/constants/project";
 
 import { HardwareNode } from "@/components/HardwareNode";
 import { DatasheetUpload } from "@/components/DatasheetUpload";
@@ -57,9 +59,22 @@ function SchematicCanvas() {
   const refineMessage = useOperationsStore((s) => s.refineMessage);
   const operationsApproved = useOperationsStore((s) => s.operationsApproved);
   const opsActions = useOperationsStore((s) => s.actions);
+  const projectId = useSchematicStore((s) => s.projectId);
+  const projectIds = useSchematicStore((s) => s.projectIds);
+  const projectStatus = useSchematicStore((s) => s.projectStatus);
+  const projectMessage = useSchematicStore((s) => s.projectMessage);
+  const [newProjectId, setNewProjectId] = useState("");
 
   useEffect(() => {
-    actions.loadCatalog();
+    void (async () => {
+      await actions.loadCatalog();
+      await actions.refreshProjectList();
+      const ids = useSchematicStore.getState().projectIds;
+      const initial = ids.includes(DEFAULT_PROJECT_ID) ? DEFAULT_PROJECT_ID : ids[0];
+      if (initial) {
+        await actions.loadProject(initial);
+      }
+    })();
   }, [actions]);
 
   const placeFromCatalog = useCallback(
@@ -105,6 +120,62 @@ function SchematicCanvas() {
             <h1>EDA Platform</h1>
             <p className="editor-shell__tagline">Industrial schematic lab</p>
           </div>
+        </div>
+        <div className="editor-shell__project">
+          <label className="editor-shell__project-label" htmlFor="project-select">
+            Project
+          </label>
+          <select
+            id="project-select"
+            className="editor-shell__project-select"
+            value={projectId}
+            disabled={projectStatus === "loading"}
+            onChange={(e) => {
+              void actions.loadProject(e.target.value);
+            }}
+          >
+            {projectIds.length === 0 ? (
+              <option value={projectId}>{projectId}</option>
+            ) : (
+              projectIds.map((id) => (
+                <option key={id} value={id}>
+                  {id}
+                </option>
+              ))
+            )}
+          </select>
+          <button
+            type="button"
+            className="editor-shell__btn editor-shell__btn--compact"
+            disabled={projectStatus === "saving" || projectStatus === "loading"}
+            onClick={() => void actions.saveProject()}
+          >
+            {projectStatus === "saving" ? "Saving…" : "Save"}
+          </button>
+          <div className="editor-shell__new-project">
+            <input
+              type="text"
+              className="editor-shell__project-input"
+              placeholder="new_project_id"
+              value={newProjectId}
+              onChange={(e) => setNewProjectId(e.target.value)}
+            />
+            <button
+              type="button"
+              className="editor-shell__btn editor-shell__btn--compact"
+              onClick={() => {
+                actions.createProject(newProjectId);
+                setNewProjectId("");
+              }}
+            >
+              New
+            </button>
+          </div>
+          {projectMessage && (
+            <p className="editor-shell__project-message" role="status">
+              {projectMessage}
+            </p>
+          )}
         </div>
         <div className="editor-shell__actions">
           <button

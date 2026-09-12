@@ -17,7 +17,7 @@ Last reviewed: 2026-09-12 (post-merge of operations + datasheet/protocol stacks 
 | Operations | v1 | Refiner, checker, API, UI panel, optional LLM, operating docs |
 | Firmware Engineer | v1 (Pi 4) | pthreads + I2C sensors; boot delays from operations; runtime executable ops not yet |
 | UI | v1 | React Flow editor, catalog, protocols, datasheet upload, operations sidebar |
-| CI / deploy | Early | Docker Compose demo; no GitHub Actions workflow yet |
+| CI / deploy | v1 | Docker Compose with `projects/` + `generated/` mounts; GitHub Actions runs `pytest` and UI `vitest` |
 
 **North star:** datasheet → schematic → validate → behavioral operations → trustworthy firmware and runbooks, with explicit human approval gates.
 
@@ -29,10 +29,10 @@ Last reviewed: 2026-09-12 (post-merge of operations + datasheet/protocol stacks 
 
 | ID | Work | Done when |
 |----|------|-----------|
-| A1 | Project persistence in UI | Load/save `projects/<id>/schematic.json` and `metadata.json`; stable project id (today the canvas often uses in-memory `schematic_project`) |
-| A2 | Documentation alignment | User guides match product (this doc set) |
-| A3 | Docker persistence | Document or mount `projects/` and `generated/` in Compose |
-| A4 | CI baseline | `pytest` + UI `vitest` on every PR |
+| A1 | Project persistence in UI | **Done** — toolbar project selector, load/save `schematic.json`, metadata on approve/save |
+| A2 | Documentation alignment | **Done** — HOW_TO, API, Compose notes updated |
+| A3 | Docker persistence | **Done** — `projects/` and `generated/` mounted in Compose |
+| A4 | CI baseline | **Done** — `.github/workflows/ci.yml` |
 | A5 | Pi hardware smoke | Scripted or checklist validation on real board |
 
 ---

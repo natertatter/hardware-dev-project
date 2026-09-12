@@ -38,7 +38,7 @@ NEXT_PUBLIC_API_URL=http://localhost:8000 npm run dev
 
 **Windows:** `start-eda-platform.bat` (waits for API health before opening the UI). Stop stuck servers: `start-eda-platform.bat stop`
 
-**Note:** Compose mounts `hardware_library` into the API container only. Project files under `projects/` and firmware under `generated/` are easiest to persist when running the API on the host — see roadmap **A3**.
+**Note:** Docker Compose mounts `hardware_library` (read-only), `projects/`, and `generated/` into the API container so saves and firmware output survive restarts.
 
 ---
 
@@ -71,7 +71,7 @@ NEXT_PUBLIC_API_URL=http://localhost:8000 npm run dev
 |------|--------|----------------|
 | 1 | **Generate Firmware** | Writes `generated/firmware/<project_id>/` (boot delays from ops when provided) |
 
-The UI currently uses a default in-memory `project_id` (`schematic_project`) and does not save `projects/<id>/schematic.json` automatically — use the API or edit files under `projects/` for disk-backed workflows (see `projects/demo_robot/`).
+Use the toolbar **Project** selector to open disk-backed projects (default reference: `demo_robot`). **Save** writes `projects/<id>/schematic.json`; approvals update `metadata.json`. Operations drafts and master sequences continue to live under `projects/<id>/operations/`.
 
 ---
 

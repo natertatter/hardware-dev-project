@@ -11,6 +11,7 @@ from eda_platform.api.routes import (
     librarian,
     manifests,
     operations,
+    projects,
     validate,
 )
 
@@ -39,6 +40,7 @@ app.include_router(librarian.router)
 app.include_router(architect.router)
 app.include_router(firmware.router)
 app.include_router(operations.router)
+app.include_router(projects.router)
 
 
 @app.get("/health")

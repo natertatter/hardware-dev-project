@@ -84,6 +84,21 @@ export interface ProjectState {
   nets: Net[];
 }
 
+/** UI schematic draft; nets may be empty before the first wire. */
+export interface SchematicDraft {
+  project_id: string;
+  nodes: ProjectStateNode[];
+  nets: Net[];
+}
+
+export interface ProjectMetadata {
+  project_id: string;
+  schematic_approved: boolean;
+  operations_approved: boolean;
+  operations_fidelity: FidelityLevel;
+  updated_at: string;
+}
+
 /** Catalog sidebar entry derived from a server manifest. */
 export interface CatalogEntry {
   label: string;

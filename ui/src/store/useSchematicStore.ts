@@ -10,10 +10,23 @@ import {
   type NodeChange,
 } from "@xyflow/react";
 
+import { DEFAULT_PROJECT_ID } from "@/constants/project";
 import { COMPONENT_CATALOG } from "@/data/mockCatalog";
-import { autoWireProjectState, fetchManifests, generateFirmware, validateProjectState } from "@/lib/api";
+import {
+  autoWireProjectState,
+  fetchOperationsMaster,
+  fetchProjectMetadata,
+  fetchProjectSchematic,
+  fetchManifests,
+  generateFirmware,
+  listProjects,
+  saveProjectMetadata,
+  saveProjectSchematic,
+  validateProjectState,
+} from "@/lib/api";
 import type { CatalogEntry, HardwareNodeData, ProjectState } from "@/types/schemas";
 import { useOperationsStore } from "@/store/useOperationsStore";
+import { buildSchematicDraft } from "@/utils/buildSchematicDraft";
 import { compileProjectState } from "@/utils/compileProjectState";
 import { decompileProjectState } from "@/utils/decompileProjectState";
 import { defaultProtocol, pinsForProtocol } from "@/utils/protocolProfiles";
@@ -22,6 +35,7 @@ export type ValidationStatus = "idle" | "validating" | "pass" | "fail" | "error"
 export type FirmwareStatus = "idle" | "generating" | "success" | "error";
 export type AutoWireStatus = "idle" | "wiring" | "success" | "error";
 export type CatalogSource = "api" | "mock";
+export type ProjectPersistenceStatus = "idle" | "loading" | "saving" | "error";
 
 export interface ValidationIssueView {
   rule: string;
@@ -46,6 +60,10 @@ interface SchematicState {
   firmwareMessage: string | null;
   autoWireStatus: AutoWireStatus;
   autoWireMessage: string | null;
+  projectId: string;
+  projectIds: string[];
+  projectStatus: ProjectPersistenceStatus;
+  projectMessage: string | null;
   actions: {
     onNodesChange: (changes: NodeChange<Node<HardwareNodeData>>[]) => void;
     onEdgesChange: (changes: EdgeChange[]) => void;
@@ -58,6 +76,10 @@ interface SchematicState {
     approveSchematic: () => void;
     resetApproval: () => void;
     generateFirmware: () => Promise<void>;
+    refreshProjectList: () => Promise<void>;
+    loadProject: (projectId: string) => Promise<void>;
+    saveProject: () => Promise<void>;
+    createProject: (projectId: string) => void;
   };
 }
 
@@ -103,9 +125,10 @@ function mockCatalogEntries(): CatalogEntry[] {
 
 function placementOnlyProjectState(
   nodes: Node<HardwareNodeData>[],
+  projectId: string,
 ): Pick<ProjectState, "project_id" | "nodes" | "nets"> {
   return {
-    project_id: "schematic_project",
+    project_id: projectId,
     nodes: nodes.map((node) => ({
       node_id: node.id,
       component_id: node.data.manifest.component_id,
@@ -140,6 +163,10 @@ export const useSchematicStore = create<SchematicState>((set, get) => ({
   firmwareMessage: null,
   autoWireStatus: "idle",
   autoWireMessage: null,
+  projectId: DEFAULT_PROJECT_ID,
+  projectIds: [],
+  projectStatus: "idle",
+  projectMessage: null,
   actions: {
     onNodesChange: (changes) => {
       set({
@@ -242,7 +269,7 @@ export const useSchematicStore = create<SchematicState>((set, get) => ({
         autoWireMessage: null,
       });
       try {
-        const projectState = compileProjectState(get().nodes, get().edges);
+        const projectState = compileProjectState(get().nodes, get().edges, get().projectId);
         const result = await validateProjectState(projectState);
         if (result.valid) {
           set({
@@ -289,10 +316,10 @@ export const useSchematicStore = create<SchematicState>((set, get) => ({
 
       let projectState: Pick<ProjectState, "project_id" | "nodes" | "nets">;
       if (currentEdges.length === 0) {
-        projectState = placementOnlyProjectState(currentNodes);
+        projectState = placementOnlyProjectState(currentNodes, get().projectId);
       } else {
         try {
-          projectState = compileProjectState(currentNodes, currentEdges);
+          projectState = compileProjectState(currentNodes, currentEdges, get().projectId);
         } catch (err) {
           set({
             autoWireStatus: "error",
@@ -331,9 +358,18 @@ export const useSchematicStore = create<SchematicState>((set, get) => ({
       }
     },
     approveSchematic: () => {
-      if (get().validationStatus === "pass") {
-        set({ schematicApproved: true });
+      if (get().validationStatus !== "pass") {
+        return;
       }
+      set({ schematicApproved: true });
+      void (async () => {
+        try {
+          const metadata = await fetchProjectMetadata(get().projectId);
+          await saveProjectMetadata({ ...metadata, schematic_approved: true });
+        } catch {
+          // Approval still applies in-session when the API is offline.
+        }
+      })();
     },
     resetApproval: () => set({ schematicApproved: false }),
     generateFirmware: async () => {
@@ -351,7 +387,7 @@ export const useSchematicStore = create<SchematicState>((set, get) => ({
       }
       set({ firmwareStatus: "generating", firmwareMessage: null });
       try {
-        const projectState = compileProjectState(get().nodes, get().edges);
+        const projectState = compileProjectState(get().nodes, get().edges, get().projectId);
         const result = await generateFirmware(
           projectState,
           true,
@@ -369,6 +405,106 @@ export const useSchematicStore = create<SchematicState>((set, get) => ({
           firmwareMessage: err instanceof Error ? err.message : "Firmware generation failed.",
         });
       }
+    },
+    refreshProjectList: async () => {
+      try {
+        const ids = await listProjects();
+        set({ projectIds: ids });
+      } catch {
+        set({ projectIds: [] });
+      }
+    },
+    loadProject: async (projectId) => {
+      set({ projectStatus: "loading", projectMessage: null, projectId });
+      try {
+        await get().actions.refreshProjectList();
+        const schematic = await fetchProjectSchematic(projectId);
+        const { catalog } = get();
+        const manifests = Object.fromEntries(
+          catalog.map((entry) => [entry.manifest.component_id, entry.manifest]),
+        );
+        const { nodes, edges } = decompileProjectState(schematic, manifests);
+        let metadata = await fetchProjectMetadata(projectId);
+        let operationsSequence = null;
+        try {
+          operationsSequence = await fetchOperationsMaster(projectId);
+        } catch {
+          operationsSequence = null;
+        }
+        useOperationsStore.getState().actions.hydrateFromDisk(
+          operationsSequence,
+          operationsSequence?.narrative ?? "",
+          metadata.operations_approved,
+        );
+        set({
+          nodes,
+          edges,
+          projectId,
+          projectStatus: "idle",
+          projectMessage: `Loaded project "${projectId}".`,
+          schematicApproved: metadata.schematic_approved,
+          validationStatus: "idle",
+          validationIssues: [],
+          validationMessage: null,
+          firmwareStatus: "idle",
+          firmwareOutputDir: null,
+          firmwareMessage: null,
+          autoWireStatus: "idle",
+          autoWireMessage: null,
+        });
+      } catch (err) {
+        set({
+          projectStatus: "error",
+          projectMessage:
+            err instanceof Error ? err.message : `Failed to load project "${projectId}".`,
+        });
+      }
+    },
+    saveProject: async () => {
+      const { nodes, edges, projectId } = get();
+      set({ projectStatus: "saving", projectMessage: null });
+      try {
+        const draft = buildSchematicDraft(nodes, edges, projectId);
+        await saveProjectSchematic(draft);
+        await get().actions.refreshProjectList();
+        set({
+          projectStatus: "idle",
+          projectMessage: `Saved projects/${projectId}/schematic.json`,
+          schematicApproved: false,
+        });
+        const metadata = await fetchProjectMetadata(projectId);
+        if (metadata.schematic_approved) {
+          await saveProjectMetadata({ ...metadata, schematic_approved: false });
+        }
+      } catch (err) {
+        set({
+          projectStatus: "error",
+          projectMessage: err instanceof Error ? err.message : "Save failed.",
+        });
+      }
+    },
+    createProject: (rawId) => {
+      const projectId = rawId.trim().replace(/\s+/g, "_");
+      if (!/^[a-zA-Z][a-zA-Z0-9_-]*$/.test(projectId)) {
+        set({
+          projectStatus: "error",
+          projectMessage:
+            "Project id must start with a letter and use only letters, numbers, underscores, or hyphens.",
+        });
+        return;
+      }
+      useOperationsStore.getState().actions.hydrateFromDisk(null, "", false);
+      set({
+        projectId,
+        nodes: [],
+        edges: [],
+        ...resetWorkflowState(),
+        validationStatus: "idle",
+        validationIssues: [],
+        validationMessage: null,
+        projectStatus: "idle",
+        projectMessage: `New project "${projectId}" — place parts and save to create files on disk.`,
+      });
     },
   },
 }));

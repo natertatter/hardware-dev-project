@@ -82,6 +82,18 @@ Clears the in-memory manifest cache so the next catalog read sees new parts.
 
 ---
 
+## Projects (schematic + metadata)
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/v1/projects` | List project ids that have `schematic.json` on disk. |
+| GET | `/api/v1/projects/{project_id}/schematic` | Load `schematic.json`. **404** if missing. |
+| PUT | `/api/v1/projects/{project_id}/schematic` | Save schematic from `SchematicDraft` (`nodes` required; `nets` may be empty — server adds a placeholder net for placement-only saves). Clears `schematic_approved` in metadata. |
+| GET | `/api/v1/projects/{project_id}/metadata` | Load `metadata.json` or defaults for a new project. |
+| PUT | `/api/v1/projects/{project_id}/metadata` | Persist approval flags and fidelity stage. |
+
+---
+
 ## Operations sequence
 
 Project artifacts live under `projects/<project_id>/` (`schematic.json`, `metadata.json`, `operations/`). Several routes read or write those paths on disk.
@@ -103,6 +115,6 @@ Project artifacts live under `projects/<project_id>/` (`schematic.json`, `metada
 
 ## UI integration notes
 
-The Next.js app uses a subset of these endpoints from `ui/src/lib/api.ts`. The canvas currently compiles an in-memory `ProjectState` (default `project_id` often `schematic_project`) and does not yet persist schematics to `projects/<id>/` — see roadmap item **A1**.
+The Next.js app uses these endpoints from `ui/src/lib/api.ts`, including project list/load/save and operations workflows. The default reference project is `demo_robot`.
 
 Interactive API docs: start the API and open `http://localhost:8000/docs`.

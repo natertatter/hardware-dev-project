@@ -117,3 +117,14 @@ def list_operations_refined(project_id: str) -> list[Path]:
     if not refined_dir.is_dir():
         return []
     return sorted(refined_dir.glob("refined_v*.json"))
+
+
+def list_project_ids() -> list[str]:
+    """Return sorted project ids that have a schematic.json on disk."""
+    if not _PROJECTS_DIR.is_dir():
+        return []
+    ids: list[str] = []
+    for child in sorted(_PROJECTS_DIR.iterdir()):
+        if child.is_dir() and (child / "schematic.json").is_file():
+            ids.append(child.name)
+    return ids

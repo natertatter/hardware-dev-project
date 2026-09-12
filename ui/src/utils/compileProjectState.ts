@@ -114,7 +114,7 @@ function netName(netType: NetType, index: number, pinTypes: PinType[]): string {
 export function compileProjectState(
   nodes: Node<HardwareNodeData>[],
   edges: Edge[],
-  projectId = "schematic_project"
+  projectId = "demo_robot"
 ): ProjectState {
   const uf = new UnionFind();
 
