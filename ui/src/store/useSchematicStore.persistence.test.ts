@@ -74,6 +74,12 @@ describe("useSchematicStore persistence", () => {
     expect(useSchematicStore.getState().projectMessage).toMatch(/already exists/i);
   });
 
+  it("createProject adds the new id to projectIds for the selector", () => {
+    useSchematicStore.getState().actions.createProject("my_new_robot");
+    expect(useSchematicStore.getState().projectId).toBe("my_new_robot");
+    expect(useSchematicStore.getState().projectIds).toContain("my_new_robot");
+  });
+
   it("approveSchematic saves before setting schematicApproved", async () => {
     const sensorManifest = {
       component_id: "sens_ina219",

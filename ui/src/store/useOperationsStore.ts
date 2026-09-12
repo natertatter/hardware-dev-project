@@ -58,7 +58,7 @@ interface OperationsState {
     captureDraft: () => Promise<void>;
     refine: () => Promise<void>;
     validate: () => Promise<void>;
-    mergeToMaster: () => Promise<void>;
+    mergeToMaster: () => Promise<boolean>;
     approveOperations: () => Promise<void>;
     resetOperationsApproval: () => void;
     getActiveSequence: () => OperationsSequence | null;
@@ -231,7 +231,7 @@ export const useOperationsStore = create<OperationsState>((set, get) => ({
       const sequence = get().refinedSequence;
       if (!sequence) {
         set({ operationsMessage: "Refine operations before merging to master." });
-        return;
+        return false;
       }
       try {
         const projectState = schematicProjectState();
@@ -241,10 +241,12 @@ export const useOperationsStore = create<OperationsState>((set, get) => ({
           refinedSequence: result.master,
           operationsMessage: result.message,
         });
+        return true;
       } catch (err) {
         set({
           operationsMessage: err instanceof Error ? err.message : "Merge failed.",
         });
+        return false;
       }
     },
     approveOperations: async () => {
@@ -253,7 +255,15 @@ export const useOperationsStore = create<OperationsState>((set, get) => ({
       }
       try {
         if (get().refinedSequence) {
-          await get().actions.mergeToMaster();
+          const merged = await get().actions.mergeToMaster();
+          if (!merged) {
+            set({
+              operationsApproved: false,
+              operationsMessage:
+                get().operationsMessage ?? "Merge to master failed — cannot approve operations.",
+            });
+            return;
+          }
         }
         await approveOperationsOnServer(currentProjectId());
         set({ operationsApproved: true, operationsMessage: "Operations approved." });

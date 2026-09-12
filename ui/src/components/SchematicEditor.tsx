@@ -135,15 +135,14 @@ function SchematicCanvas() {
               void actions.loadProject(e.target.value);
             }}
           >
-            {projectIds.length === 0 ? (
-              <option value={projectId}>{projectId}</option>
-            ) : (
-              projectIds.map((id) => (
-                <option key={id} value={id}>
-                  {id}
-                </option>
-              ))
-            )}
+            {(projectIds.includes(projectId)
+              ? projectIds
+              : [...projectIds, projectId]
+            ).map((id) => (
+              <option key={id} value={id}>
+                {id}
+              </option>
+            ))}
           </select>
           <button
             type="button"

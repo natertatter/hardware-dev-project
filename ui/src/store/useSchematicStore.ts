@@ -530,8 +530,12 @@ export const useSchematicStore = create<SchematicState>((set, get) => ({
         return;
       }
       useOperationsStore.getState().actions.hydrateFromDisk(null, "", false);
+      const projectIds = get().projectIds.includes(projectId)
+        ? get().projectIds
+        : [...get().projectIds, projectId];
       set({
         projectId,
+        projectIds,
         nodes: [],
         edges: [],
         lastSavedDraftHash: null,

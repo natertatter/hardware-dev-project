@@ -9,7 +9,12 @@ vi.mock("@/lib/api", () => ({
 }));
 
 import { DEFAULT_PROJECT_ID } from "@/constants/project";
-import { approveOperationsOnServer, saveOperationsDraft, refineOperations } from "@/lib/api";
+import {
+  approveOperationsOnServer,
+  mergeOperations,
+  refineOperations,
+  saveOperationsDraft,
+} from "@/lib/api";
 import { requiresOperationsApproval, useOperationsStore } from "@/store/useOperationsStore";
 import { useSchematicStore } from "@/store/useSchematicStore";
 
@@ -221,6 +226,30 @@ describe("useOperationsStore", () => {
 
       await useOperationsStore.getState().actions.approveOperations();
 
+      expect(useOperationsStore.getState().operationsApproved).toBe(false);
+    });
+
+    it("does not call server approve when merge to master fails", async () => {
+      (mergeOperations as any).mockRejectedValue(new Error("merge failed"));
+      useOperationsStore.setState({
+        operationsStatus: "pass",
+        refinedSequence: {
+          project_id: DEFAULT_PROJECT_ID,
+          fidelity: "steps",
+          version: 1,
+          steps: [{ step_id: "s1", description: "x" }],
+          open_questions: [],
+        },
+      });
+      useSchematicStore.setState({
+        nodes: [placedNode("mcu_1")],
+        edges: [],
+        projectId: DEFAULT_PROJECT_ID,
+      });
+
+      await useOperationsStore.getState().actions.approveOperations();
+
+      expect(approveOperationsOnServer).not.toHaveBeenCalled();
       expect(useOperationsStore.getState().operationsApproved).toBe(false);
     });
   });
