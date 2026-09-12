@@ -1,6 +1,8 @@
 # Repository Folder Structure
 
-This document defines the top-level layout for the intelligent EDA and firmware code-generation platform. The structure enforces strict separation between UI, agent orchestration, hardware knowledge, and generated output so each agent can operate on well-defined JSON artifacts without tight coupling.
+Top-level layout for the intelligent EDA and firmware code-generation platform. UI, agents, hardware knowledge, and generated output stay separated so each stage operates on well-defined JSON artifacts.
+
+**Related docs:** [`API.md`](API.md), [`OPERATIONS_SEQUENCE.md`](OPERATIONS_SEQUENCE.md), [`ROADMAP.md`](../ROADMAP.md), [`ENGINEERING_DECISIONS.md`](ENGINEERING_DECISIONS.md).
 
 ## Directory Tree
 
@@ -8,133 +10,106 @@ This document defines the top-level layout for the intelligent EDA and firmware 
 hardware-dev-project/
 ├── README.md
 ├── pyproject.toml
-├── .gitignore
+├── docker-compose.yml
 ├── docs/
+│   ├── HOW_TO.md
+│   ├── ROADMAP.md
 │   ├── architecture/
-│   │   └── FOLDER_STRUCTURE.md       # This document
+│   │   ├── API.md
+│   │   ├── ENGINEERING_DECISIONS.md
+│   │   ├── FOLDER_STRUCTURE.md
+│   │   └── OPERATIONS_SEQUENCE.md
 │   └── firmware/
-│       └── CONCURRENCY_STRATEGY.md     # Firmware Agent threading model
+│       └── CONCURRENCY_STRATEGY.md
 │
-├── src/eda_platform/                   # Core Python package
-│   ├── __init__.py
-│   ├── schemas/                        # Pydantic models (lingua franca)
-│   │   ├── __init__.py
-│   │   ├── enums.py
-│   │   ├── component_manifest.py       # ComponentManifest schema
-│   │   ├── project_state.py            # ProjectState schema
-│   │   ├── operations_sequence.py      # OperationsSequence schema
-│   │   └── project_metadata.py         # Project approval metadata
-│   ├── agents/                         # Specialized swarm agents
-│   │   ├── __init__.py
-│   │   ├── librarian/                  # PDF → ComponentManifest
-│   │   ├── architect/                  # Intent → ProjectState layout
-│   │   ├── logic_checker/              # ProjectState validation
-│   │   ├── operations_refiner/         # Vibe/draft → refined operations
-│   │   ├── operations_checker/         # Operations vs schematic validation
-│   │   └── firmware_engineer/          # ProjectState → HAL + firmware
-│   └── orchestration/                  # Agent routing & handoff pipeline
-│       └── __init__.py
+├── src/eda_platform/
+│   ├── schemas/                        # Pydantic lingua franca
+│   ├── agents/                         # Librarian, Architect, Logic Checker,
+│   │                                   # Operations Refiner/Checker, Firmware Engineer
+│   ├── api/                            # FastAPI routes, project_loader, manifest_loader
+│   ├── llm/                            # Optional LLM provider (BYOK)
+│   └── orchestration/                  # Pipeline stage helpers
 │
-├── hardware_library/                   # Persistent hardware knowledge base
-│   ├── datasheets/                     # Source PDF datasheets (Librarian input)
-│   └── manifests/                      # Validated ComponentManifest JSON files
-│       ├── *.example.json              # Reference fixtures (validated by tests)
+├── hardware_library/
+│   ├── datasheets/                     # PDF inputs (Librarian)
+│   └── manifests/                      # ComponentManifest JSON (*.json, *.example.json)
 │
-├── projects/                           # User project artifacts
-│   ├── <project_id>/                   # Per-project schematic, metadata, operations
-│   │   ├── schematic.json
-│   │   ├── metadata.json
-│   │   └── operations/
-│   │       ├── master.json
-│   │       ├── drafts/
-│   │       └── refined/
-│   └── *.example.json                  # Reference ProjectState fixtures
+├── projects/
+│   └── <project_id>/
+│       ├── schematic.json              # ProjectState
+│       ├── metadata.json               # Approval flags, operations fidelity
+│       └── operations/
+│           ├── master.json
+│           ├── drafts/
+│           └── refined/
 │
-├── generated/                          # Agent output (never hand-edited)
-│   └── firmware/                       # HAL + application code from Firmware Agent
-│       └── <project_id>/
+├── generated/firmware/<project_id>/    # Build output (gitignored)
 │
-├── ui/                                 # Future web-based schematic editor (placeholder)
-│   └── README.md
+├── ui/                                 # Next.js + React Flow schematic editor
 │
-└── tests/
-    └── schemas/                        # Schema validation unit tests
+└── tests/                              # pytest (schemas, agents, API)
 ```
 
-## Major Directory Responsibilities
+## Major directory responsibilities
 
 ### `src/eda_platform/schemas/`
 
-**Purpose:** Backend data validation layer.
-
-Defines the canonical Pydantic models for `ComponentManifest` and `ProjectState`. Every agent reads and writes JSON that must validate against these models before handoff. This is the single source of truth for inter-agent communication.
+Canonical Pydantic models: `ComponentManifest`, `ProjectState`, `OperationsSequence`, protocols, enums. All agents and the API validate against these types.
 
 ### `src/eda_platform/agents/`
 
-**Purpose:** Agent implementations, one subdirectory per swarm role.
+| Subdirectory | Role | Primary I/O |
+|--------------|------|-------------|
+| `librarian/` | Ingest datasheets / JSON uploads | PDF or JSON → `ComponentManifest` |
+| `architect/` | Template auto-wire | `ProjectState` draft → wired `ProjectState` |
+| `logic_checker/` | Electrical / structural rules | `ProjectState` → validation result |
+| `operations_refiner/` | Bind steps, timing, fidelity | `OperationsSequence` + schematic → refined sequence |
+| `operations_checker/` | Ops vs schematic rules | `OperationsSequence` → validation result |
+| `operations_docs/` | Operating procedure markdown | sequence + schematic → text |
+| `firmware_engineer/` | Pi 4 pthreads codegen | validated schematic → C tree |
 
-| Subdirectory       | Agent              | Input                         | Output              |
-|--------------------|--------------------|-------------------------------|---------------------|
-| `librarian/`       | Hardware Librarian | PDF datasheets                | `ComponentManifest` |
-| `architect/`       | Systems Architect  | Manifests + user intent       | `ProjectState`      |
-| `logic_checker/`   | Logic Checker      | `ProjectState` + manifests    | Validated state / fatal errors |
-| `firmware_engineer/` | Firmware Engineer | Validated `ProjectState`    | HAL + threaded firmware |
-
-Each agent is isolated: it receives typed JSON, performs one job, and emits typed JSON. No agent reaches into another agent's internals.
+Agents do not call each other’s internals; the API and `orchestration/` coordinate handoffs.
 
 ### `src/eda_platform/orchestration/`
 
-**Purpose:** Agent Orchestration.
-
-Coordinates the swarm pipeline: Librarian → Architect → Logic Checker → (user approval) → Firmware Engineer. Handles routing, error propagation, and state persistence between stages. Intentionally lightweight—no heavy framework until complexity demands it.
+Library functions for pipeline stages (refine, validate, merge, approve metadata). Not yet exposed as a single “run pipeline” HTTP endpoint — see roadmap **B4**.
 
 ### `hardware_library/`
 
-**Purpose:** Hardware Library.
-
-- `datasheets/` — Raw PDF inputs scanned by the Librarian.
-- `manifests/` — Parsed, validated `ComponentManifest` JSON keyed by `component_id` (e.g., `mcu_rp2040.json`). Reused across projects.
+Long-lived component knowledge. Manifests are shared across projects. Upload API writes here and refreshes the catalog cache.
 
 ### `projects/`
 
-**Purpose:** Per-project schematic state.
-
-Stores `ProjectState` JSON and project metadata. The Architect writes here; the Logic Checker reads from here; the UI (future) renders from here.
+Per-project source of truth on disk for API-driven workflows (`demo_robot`, etc.). The **web UI** still keeps most schematic state in memory unless you save via API or files manually — roadmap **A1**.
 
 ### `generated/firmware/`
 
-**Purpose:** Output Code.
-
-Firmware Engineer writes platform-specific HAL layers and application code here, organized by `project_id`. Generated artifacts are treated as build output, not source-of-truth.
+Firmware Engineer output only; never edit by hand. Regenerated from approved schematic (+ optional operations).
 
 ### `ui/`
 
-**Purpose:** User Interface (future).
-
-Placeholder for the web-based visual schematic editor. Will consume `ProjectState` for rendering and emit user edits back as updated `ProjectState`. No functional UI in the initial scaffold.
-
-### `docs/`
-
-**Purpose:** Architecture and design decisions.
-
-Holds human-readable specifications (folder layout, concurrency strategy, agent directives) that govern agent behavior.
+Production schematic editor: catalog, wiring, validation panel, operations panel, datasheet upload, protocol selection. Talks to the API when reachable; falls back to a built-in mock catalog when offline.
 
 ### `tests/`
 
-**Purpose:** Automated validation.
+Schema, agent, API, and orchestration tests. Run with `python3 -m pytest` from the repo root.
 
-Schema tests ensure Pydantic models enforce the JSON contracts. Agent and orchestration tests will be added as implementations land.
-
-## Data Flow Summary
+## Data flow
 
 ```
-datasheets/  ──►  librarian  ──►  manifests/  (ComponentManifest)
-                                      │
-user intent ──►  architect  ──►  projects/   (ProjectState)
-                                      │
-                               logic_checker (validate)
-                                      │
-                               user approval
-                                      │
-                               firmware_engineer ──►  generated/firmware/
+datasheets/ ──► librarian ──► manifests/     (ComponentManifest)
+                                    │
+         UI / API ──► projects/     │         (ProjectState + operations)
+                    schematic         │
+                         │            │
+                         ▼            │
+                  logic_checker ◄─────┘
+                         │
+              [approve schematic]
+                         │
+              operations_refiner ──► operations_checker
+                         │
+              [approve operations]
+                         │
+                  firmware_engineer ──► generated/firmware/
 ```

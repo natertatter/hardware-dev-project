@@ -1,14 +1,14 @@
 # EDA Platform UI
 
-Next.js + React Flow schematic editor. Compiles visual nodes/edges into backend `ProjectState` JSON.
+Next.js + React Flow schematic editor. Compiles nodes and edges into backend `ProjectState` JSON and calls the FastAPI backend for validation, auto-wire, operations, and firmware generation.
 
-## Quick Start
+## Quick start
 
 ```bash
 cd ui
 npm install
-npm run dev        # http://localhost:3000
-npm run test       # vitest unit tests (net compiler)
+NEXT_PUBLIC_API_URL=http://localhost:8000 npm run dev   # http://localhost:3000
+npm run test       # vitest (stores, net compiler, protocol profiles)
 npm run build      # production build
 ```
 
@@ -16,10 +16,12 @@ npm run build      # production build
 
 | Path | Responsibility |
 |------|----------------|
-| `src/store/useSchematicStore.ts` | Zustand store — nodes, edges, catalog, actions |
-| `src/components/HardwareNode.tsx` | Custom React Flow node with dynamic pin Handles |
-| `src/components/SchematicEditor.tsx` | Canvas MVP + "Validate Architecture" button |
-| `src/utils/compileProjectState.ts` | Union-Find net compiler → `ProjectState` JSON |
-| `src/data/mockCatalog.ts` | MCU + INA219 ComponentManifest fixtures |
+| `src/store/useSchematicStore.ts` | Canvas, catalog (API or offline mock), validation, auto-wire, firmware |
+| `src/store/useOperationsStore.ts` | Operations narrative, refine/validate/merge/approve |
+| `src/components/SchematicEditor.tsx` | Shell: library sidebar, canvas, validation + operations panels |
+| `src/components/HardwareNode.tsx` | Custom node with pin handles and protocol selector |
+| `src/components/DatasheetUpload.tsx` | Librarian upload to API |
+| `src/utils/compileProjectState.ts` | Union-Find net compiler → `ProjectState` |
+| `src/lib/api.ts` | Typed fetch wrappers for `/api/v1/*` |
 
-Click **Validate Architecture** to compile the canvas and `console.log` the resulting `ProjectState`.
+User guide: [`../docs/HOW_TO.md`](../docs/HOW_TO.md).

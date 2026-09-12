@@ -1,22 +1,20 @@
 # Intelligent EDA & Firmware Code-Generation Platform
 
-Multi-agent swarm for robotics hardware design: datasheet ingestion → schematic layout → validation → threaded firmware generation.
+Multi-agent swarm for robotics hardware design: datasheet ingestion → schematic layout → validation → operations sequences → threaded firmware generation.
 
 ## Architecture
 
 - **Agents:** Hardware Librarian, Systems Architect, Logic Checker, Operations Refiner, Operations Checker, Firmware Engineer
 - **Lingua franca:** `ComponentManifest`, `ProjectState`, and `OperationsSequence` JSON schemas (Pydantic-validated)
-- **Docs:** See `docs/architecture/FOLDER_STRUCTURE.md`, `docs/architecture/OPERATIONS_SEQUENCE.md`, and `docs/firmware/CONCURRENCY_STRATEGY.md`
+- **Docs:** [`docs/HOW_TO.md`](docs/HOW_TO.md) · [`docs/ROADMAP.md`](docs/ROADMAP.md) · [`docs/architecture/API.md`](docs/architecture/API.md) · [`docs/architecture/OPERATIONS_SEQUENCE.md`](docs/architecture/OPERATIONS_SEQUENCE.md) · [`docs/firmware/CONCURRENCY_STRATEGY.md`](docs/firmware/CONCURRENCY_STRATEGY.md)
 
 ## Quick Start
-
-**How-to (at a glance):** [`docs/HOW_TO.md`](docs/HOW_TO.md)
 
 ### Full stack (Docker Compose)
 
 ```bash
 docker compose up --build
-# API: http://localhost:8000/health
+# API: http://localhost:8000/health  (interactive docs: /docs)
 # UI:  http://localhost:3000
 ```
 
@@ -25,42 +23,40 @@ docker compose up --build
 ```bash
 pip install -e ".[dev]"
 uvicorn eda_platform.api.main:app --reload --port 8000
-python3 -m pytest -v
-python3 tests/test_logic_checker.py   # headless Logic Checker integration tests
+python3 -m pytest -q
 ```
+
+Optional LLM-assisted operations refine: `pip install -e ".[llm]"` and configure Anthropic credentials per `src/eda_platform/llm/provider.py`.
 
 ### Frontend (Next.js)
 
 ```bash
 cd ui && npm install
 NEXT_PUBLIC_API_URL=http://localhost:8000 npm run dev   # http://localhost:3000
-npm run test       # net compiler + store unit tests
+npm run test
 ```
 
-### API Endpoints
+### API overview
 
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | `/health` | Liveness check |
-| GET | `/api/v1/manifests` | Component catalog |
-| POST | `/api/v1/validate` | Run Logic Checker on `ProjectState` |
-| POST | `/api/v1/architect/auto-wire` | Template I2C auto-wiring |
-| POST | `/api/v1/firmware/generate` | Generate pthreads C firmware for Raspberry Pi 4 |
-| GET | `/api/v1/projects/{id}/operations/master` | Load master operations sequence |
-| PUT | `/api/v1/projects/{id}/operations/master` | Save master operations sequence |
-| POST | `/api/v1/projects/{id}/operations/drafts` | Capture vibe/draft input |
-| POST | `/api/v1/operations/refine` | Refine operations against schematic + manifests |
-| POST | `/api/v1/operations/validate` | Validate operations sequence |
-| POST | `/api/v1/operations/merge` | Promote refined sequence to master |
-| POST | `/api/v1/operations/generate-docs` | Generate operating procedure + bring-up checklist |
+All application routes use the `/api/v1` prefix. See **[`docs/architecture/API.md`](docs/architecture/API.md)** for request bodies, errors, and disk paths.
 
-See `docs/architecture/ENGINEERING_DECISIONS.md` for Phase 4–8 design rationale.
+| Area | Methods | Highlights |
+|------|---------|------------|
+| Health | `GET /health` | Liveness |
+| Catalog | `GET /api/v1/manifests`, `GET .../manifests/{id}` | Hardware library |
+| Librarian | `POST /api/v1/librarian/upload` | JSON or PDF → manifest |
+| Validation | `POST /api/v1/validate` | Logic Checker |
+| Architect | `POST /api/v1/architect/auto-wire` | Template I2C / serial wiring |
+| Operations | `GET/PUT .../operations/master`, drafts, refine, validate, merge, approve, generate-docs | See API doc |
+| Firmware | `POST /api/v1/firmware/generate` | Pi 4 pthreads C; requires schematic approval; operations approval when sequence provided |
 
-### Firmware output (Phase 9)
+Design rationale for early phases: [`docs/architecture/ENGINEERING_DECISIONS.md`](docs/architecture/ENGINEERING_DECISIONS.md).
 
-After validating and approving a schematic in the UI, click **Generate Firmware**. Output is written to `generated/firmware/<project_id>/`.
+### Firmware output
 
-On your Raspberry Pi 4:
+After validating and approving in the UI (and operations when used), **Generate Firmware** writes to `generated/firmware/<project_id>/`.
+
+On Raspberry Pi 4:
 
 ```bash
 cd generated/firmware/<project_id>
@@ -68,14 +64,14 @@ make
 sudo ./<project_id>_firmware   # requires I2C enabled (raspi-config)
 ```
 
-## Project Layout
+## Project layout
 
 | Directory | Responsibility |
 |-----------|----------------|
 | `src/eda_platform/schemas/` | Pydantic data validation layer |
 | `src/eda_platform/agents/` | Swarm agent implementations |
-| `src/eda_platform/orchestration/` | Agent pipeline routing |
+| `src/eda_platform/orchestration/` | Pipeline stage helpers |
 | `hardware_library/` | Datasheets and component manifests |
-| `projects/` | Per-project schematic state |
+| `projects/` | Per-project schematic, metadata, operations |
 | `generated/firmware/` | Output HAL and application code |
 | `ui/` | Next.js + React Flow schematic editor |

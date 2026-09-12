@@ -43,15 +43,15 @@ This document records five architectural decisions made when starting Phases 4â€
 - Template output is still valid `ProjectState` JSON, so the Logic Checker and future Firmware Engineer consume the same schema.
 - LLM layout can later suggest positions and net names, with the Logic Checker as the safety gate.
 
-## 5. Approval UX: Explicit Two-Step (Approve Schematic â†’ Generate Firmware)
+## 5. Approval UX: Validate â†’ Approve â†’ Generate
 
-**Decision:** The UI separates **Validate Architecture** from **Approve Schematic**. Firmware generation (Phase 9) will only run on an explicitly approved, validation-passing schematic.
+**Decision:** The UI separates **Validate Architecture** from **Approve Schematic**. Firmware generation runs only on an explicitly approved, validation-passing schematic. When an operations sequence is in play, **operations must also be validated and approved** before codegen.
 
 **Rationale:**
 - Validation is cheap and repeatable; approval is an intentional human checkpoint before irreversible codegen.
 - Editing the canvas after approval clears the approved state, preventing stale firmware from a changed schematic.
-- The two-step model maps cleanly to CI: validate on every save, approve/tag for release builds.
-- Keeps agent responsibilities clear: Logic Checker validates; the human (or future review agent) approves; Firmware Engineer generates.
+- The same pattern extends to behavioral specs: Operations Checker validates; the human approves; Firmware Engineer generates.
+- Maps cleanly to CI: validate on every change, approve/tag for release builds.
 
 ---
 
@@ -63,4 +63,4 @@ This document records five architectural decisions made when starting Phases 4â€
 | 2 | Firmware target | Raspberry Pi 4 (Linux, pthreads) |
 | 3 | Deployment | Docker Compose + local dual-server dev |
 | 4 | Architect v1 | Template I2C auto-wire (deterministic) |
-| 5 | Approval UX | Validate, then explicit Approve Schematic |
+| 5 | Approval UX | Validate schematic (and operations when used), then explicit approve before generate |

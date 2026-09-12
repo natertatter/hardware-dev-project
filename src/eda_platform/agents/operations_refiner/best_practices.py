@@ -2,7 +2,7 @@
 
 from eda_platform.schemas import ComponentType
 
-# Timing defaults (ms) — overridden by manifest fields when Phase 3 adds them.
+# Timing defaults (ms) — overridden by manifest operational_constraints when present.
 POWER_ON_SETTLE_MS = 100
 I2C_BUS_SETTLE_MS = 10
 I2C_SENSOR_POLL_PERIOD_MS = 20
