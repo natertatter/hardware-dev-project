@@ -1,19 +1,39 @@
-"""Smoke-test the Horizon A verification script."""
+"""Smoke-test the Horizon A verification helpers."""
 
-import subprocess
-import sys
+import importlib.util
+import shutil
 from pathlib import Path
 
+import pytest
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
-SCRIPT = REPO_ROOT / "scripts" / "horizon_a_verify.py"
+_spec = importlib.util.spec_from_file_location(
+    "horizon_a_verify",
+    REPO_ROOT / "scripts" / "horizon_a_verify.py",
+)
+_ha = importlib.util.module_from_spec(_spec)
+assert _spec.loader is not None
+_spec.loader.exec_module(_ha)
+
+VerifyError = _ha.VerifyError
+verify_pipeline = _ha.verify_pipeline
+verify_project_api = _ha.verify_project_api
 
 
-def test_horizon_a_verify_script_exits_zero():
-    proc = subprocess.run(
-        [sys.executable, str(SCRIPT)],
-        cwd=REPO_ROOT,
-        capture_output=True,
-        text=True,
-    )
-    assert proc.returncode == 0, proc.stderr or proc.stdout
-    assert "All Horizon A host checks passed" in proc.stdout
+def test_horizon_a_verify_project_api():
+    verify_project_api()
+
+
+def test_horizon_a_verify_pipeline_write_firmware(tmp_path: Path):
+    compiled = verify_pipeline(True, tmp_path, require_toolchain=shutil.which("gcc") is not None)
+    if shutil.which("gcc") and shutil.which("make"):
+        assert compiled is True
+    else:
+        assert compiled is False
+
+
+def test_horizon_a_verify_requires_toolchain(tmp_path: Path):
+    if shutil.which("gcc") and shutil.which("make"):
+        pytest.skip("toolchain present")
+    with pytest.raises(VerifyError, match="gcc/make required"):
+        verify_pipeline(True, tmp_path, require_toolchain=True)

@@ -169,15 +169,15 @@ export async function listProjects(): Promise<string[]> {
   return data.project_ids;
 }
 
-export async function fetchProjectSchematic(projectId: string): Promise<ProjectState> {
-  const data = await apiFetch<{ schematic: ProjectState }>(
+export async function fetchProjectSchematic(projectId: string): Promise<SchematicDraft> {
+  const data = await apiFetch<{ schematic: SchematicDraft }>(
     `/api/v1/projects/${projectId}/schematic`,
   );
   return data.schematic;
 }
 
-export async function saveProjectSchematic(draft: SchematicDraft): Promise<ProjectState> {
-  const data = await apiFetch<{ schematic: ProjectState }>(
+export async function saveProjectSchematic(draft: SchematicDraft): Promise<SchematicDraft> {
+  const data = await apiFetch<{ schematic: SchematicDraft }>(
     `/api/v1/projects/${draft.project_id}/schematic`,
     {
       method: "PUT",
@@ -207,6 +207,15 @@ export async function saveProjectMetadata(metadata: ProjectMetadata): Promise<Pr
 
 export async function fetchOperationsMaster(projectId: string): Promise<OperationsSequence> {
   return apiFetch<OperationsSequence>(`/api/v1/projects/${projectId}/operations/master`);
+}
+
+export async function approveOperationsOnServer(
+  projectId: string,
+): Promise<{ project_id: string; operations_approved: boolean }> {
+  return apiFetch(`/api/v1/projects/${projectId}/operations/approve`, {
+    method: "POST",
+    body: JSON.stringify({}),
+  });
 }
 
 export async function uploadDatasheet(file: File): Promise<UploadManifestResponse> {

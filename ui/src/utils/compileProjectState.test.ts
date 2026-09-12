@@ -114,7 +114,7 @@ describe("compileProjectState", () => {
       },
     ];
 
-    const state = compileProjectState(nodes, edges);
+    const state = compileProjectState(nodes, edges, "test_project");
     const gndNets = state.nets.filter((n) => n.net_type === "GND");
     expect(gndNets).toHaveLength(1);
     expect(gndNets[0].connections).toHaveLength(3);
@@ -125,7 +125,7 @@ describe("compileProjectState", () => {
     const edges: Edge[] = [
       { id: "e1", source: "mcu_1", target: "mcu_1" },
     ];
-    expect(() => compileProjectState(nodes, edges)).toThrow("missing sourceHandle");
+    expect(() => compileProjectState(nodes, edges, "test_project")).toThrow("missing sourceHandle");
   });
 
   it("throws when nodes are placed but nothing is wired (no nets)", () => {
@@ -137,10 +137,10 @@ describe("compileProjectState", () => {
       makeNode("mcu_1", "mcu_rp2040"),
       makeNode("sensor_1", "sens_ina219"),
     ];
-    expect(() => compileProjectState(nodes, [])).toThrow("no nets found");
+    expect(() => compileProjectState(nodes, [], "test_project")).toThrow("no nets found");
   });
 
   it("throws when called with zero nodes", () => {
-    expect(() => compileProjectState([], [])).toThrow("no nodes on canvas");
+    expect(() => compileProjectState([], [], "test_project")).toThrow("no nodes on canvas");
   });
 });

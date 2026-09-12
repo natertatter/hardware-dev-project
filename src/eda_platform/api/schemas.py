@@ -176,7 +176,7 @@ class ProjectListResponse(BaseModel):
 
 
 class ProjectSchematicResponse(BaseModel):
-    schematic: ProjectState
+    schematic: SchematicDraft
 
 
 class ProjectMetadataResponse(BaseModel):

@@ -23,13 +23,12 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_PROJECT = "demo_robot"
 
 
+class VerifyError(RuntimeError):
+    """Raised when a verification step fails (testable without subprocess)."""
+
+
 def _step(name: str) -> None:
     print(f"\n==> {name}")
-
-
-def _fail(msg: str) -> None:
-    print(f"FAIL: {msg}", file=sys.stderr)
-    sys.exit(1)
 
 
 def verify_project_api() -> None:
@@ -42,17 +41,23 @@ def verify_project_api() -> None:
     client = TestClient(app)
     listed = client.get("/api/v1/projects")
     if listed.status_code != 200:
-        _fail(f"GET /projects returned {listed.status_code}")
+        raise VerifyError(f"GET /projects returned {listed.status_code}")
     ids = listed.json().get("project_ids", [])
     if DEFAULT_PROJECT not in ids:
-        _fail(f"{DEFAULT_PROJECT} not in project list: {ids}")
+        raise VerifyError(f"{DEFAULT_PROJECT} not in project list: {ids}")
     schematic = client.get(f"/api/v1/projects/{DEFAULT_PROJECT}/schematic")
     if schematic.status_code != 200:
-        _fail(f"GET schematic for {DEFAULT_PROJECT} returned {schematic.status_code}")
+        raise VerifyError(f"GET schematic for {DEFAULT_PROJECT} returned {schematic.status_code}")
     print(f"OK — projects API lists {DEFAULT_PROJECT} ({len(ids)} project(s))")
 
 
-def verify_pipeline(write_firmware: bool, output_root: Path | None) -> None:
+def verify_pipeline(
+    write_firmware: bool,
+    output_root: Path | None,
+    *,
+    require_toolchain: bool = False,
+) -> bool:
+    """Return True if ``make`` ran successfully."""
     _step(f"Pipeline for {DEFAULT_PROJECT}")
     sys.path.insert(0, str(REPO_ROOT / "src"))
     from eda_platform.agents.firmware_engineer import generate_firmware
@@ -61,31 +66,27 @@ def verify_pipeline(write_firmware: bool, output_root: Path | None) -> None:
     from eda_platform.api.manifest_loader import load_all_manifests
     from eda_platform.api.project_loader import load_operations_master, load_project_state
 
-    schematic_path = REPO_ROOT / "projects" / DEFAULT_PROJECT / "schematic.json"
-    if not schematic_path.is_file():
-        _fail(f"missing {schematic_path}")
-
     project = load_project_state(DEFAULT_PROJECT)
     if project is None:
-        _fail("could not load project state")
+        raise VerifyError("could not load wired project state for demo_robot")
     manifests = load_all_manifests()
 
     logic = validate_project_collect(project, manifests)
     if not logic.valid:
-        _fail(f"logic checker: {logic.errors[0].message}")
+        raise VerifyError(f"logic checker: {logic.errors[0].message}")
 
     operations = load_operations_master(DEFAULT_PROJECT)
     if operations is not None:
         ops = validate_operations_collect(operations, project, manifests)
         if not ops.valid:
-            _fail(f"operations checker: {ops.errors[0].message}")
+            raise VerifyError(f"operations checker: {ops.errors[0].message}")
         print("OK — operations master validated")
     else:
         print("SKIP — no operations master (optional)")
 
     if not write_firmware:
         print("OK — validate-only (use --write-firmware to generate binaries)")
-        return
+        return False
 
     out = output_root or (REPO_ROOT / "generated" / "firmware")
     result = generate_firmware(
@@ -97,26 +98,31 @@ def verify_pipeline(write_firmware: bool, output_root: Path | None) -> None:
         output_root=out,
     )
     if not result.success:
-        _fail(result.message or "firmware generation failed")
+        raise VerifyError(result.message or "firmware generation failed")
 
     project_dir = out / result.project_id
     print(f"OK — firmware written to {project_dir}")
     print(f"     files: {', '.join(result.files_written[:5])}{'…' if len(result.files_written) > 5 else ''}")
 
-    if shutil.which("gcc") and shutil.which("make"):
-        _step("Compile generated firmware (host gcc)")
-        proc = subprocess.run(
-            ["make", "-C", str(project_dir)],
-            capture_output=True,
-            text=True,
-        )
-        if proc.returncode != 0:
-            print(proc.stdout)
-            print(proc.stderr, file=sys.stderr)
-            _fail("make failed")
-        print("OK — make succeeded")
-    else:
+    has_toolchain = shutil.which("gcc") is not None and shutil.which("make") is not None
+    if not has_toolchain:
+        if require_toolchain:
+            raise VerifyError("gcc/make required but not on PATH")
         print("SKIP — gcc/make not on PATH (Pi cross-compile not required for this check)")
+        return False
+
+    _step("Compile generated firmware (host gcc)")
+    proc = subprocess.run(
+        ["make", "-C", str(project_dir)],
+        capture_output=True,
+        text=True,
+    )
+    if proc.returncode != 0:
+        print(proc.stdout)
+        print(proc.stderr, file=sys.stderr)
+        raise VerifyError("make failed")
+    print("OK — make succeeded")
+    return True
 
 
 def verify_live_api(base_url: str) -> None:
@@ -129,15 +135,15 @@ def verify_live_api(base_url: str) -> None:
         with urllib.request.urlopen(health_url, timeout=5) as resp:
             body = json.loads(resp.read().decode())
     except (urllib.error.URLError, TimeoutError) as exc:
-        _fail(f"cannot reach {health_url}: {exc}")
+        raise VerifyError(f"cannot reach {health_url}: {exc}") from exc
     if body.get("status") != "ok":
-        _fail(f"unexpected health payload: {body}")
+        raise VerifyError(f"unexpected health payload: {body}")
 
     projects_url = f"{base_url.rstrip('/')}/api/v1/projects"
     with urllib.request.urlopen(projects_url, timeout=5) as resp:
         data = json.loads(resp.read().decode())
     if DEFAULT_PROJECT not in data.get("project_ids", []):
-        _fail(f"{DEFAULT_PROJECT} not listed by live API")
+        raise VerifyError(f"{DEFAULT_PROJECT} not listed by live API")
     print("OK — live API health and project list")
 
 
@@ -160,14 +166,27 @@ def main() -> None:
         default=None,
         help="Also probe a running API (e.g. http://localhost:8000)",
     )
+    parser.add_argument(
+        "--require-toolchain",
+        action="store_true",
+        help="Fail if gcc/make are missing when --write-firmware is set",
+    )
     args = parser.parse_args()
 
-    print("Horizon A verify — host-side smoke")
-    verify_project_api()
-    verify_pipeline(args.write_firmware, args.output_root)
-    if args.live_api:
-        verify_live_api(args.live_api)
-    print("\nAll Horizon A host checks passed.")
+    try:
+        print("Horizon A verify — host-side smoke")
+        verify_project_api()
+        verify_pipeline(
+            args.write_firmware,
+            args.output_root,
+            require_toolchain=args.require_toolchain,
+        )
+        if args.live_api:
+            verify_live_api(args.live_api)
+        print("\nAll Horizon A host checks passed.")
+    except VerifyError as exc:
+        print(f"FAIL: {exc}", file=sys.stderr)
+        sys.exit(1)
 
 
 if __name__ == "__main__":

@@ -2,6 +2,7 @@ import { create } from "zustand";
 
 import { DEFAULT_PROJECT_ID } from "@/constants/project";
 import {
+  approveOperationsOnServer,
   mergeOperations,
   refineOperations,
   saveOperationsDraft,
@@ -22,6 +23,14 @@ export interface OperationsIssueView {
 
 function currentProjectId(): string {
   return useSchematicStore.getState().projectId || DEFAULT_PROJECT_ID;
+}
+
+/** True when firmware generation must wait for operations approval. */
+export function requiresOperationsApproval(sequence: OperationsSequence | null): boolean {
+  if (!sequence) {
+    return false;
+  }
+  return sequence.fidelity !== "narrative" || sequence.steps.length > 0;
 }
 
 function emptySequence(projectId: string): OperationsSequence {
@@ -50,7 +59,7 @@ interface OperationsState {
     refine: () => Promise<void>;
     validate: () => Promise<void>;
     mergeToMaster: () => Promise<void>;
-    approveOperations: () => void;
+    approveOperations: () => Promise<void>;
     resetOperationsApproval: () => void;
     getActiveSequence: () => OperationsSequence | null;
     hydrateFromDisk: (
@@ -238,9 +247,24 @@ export const useOperationsStore = create<OperationsState>((set, get) => ({
         });
       }
     },
-    approveOperations: () => {
-      if (get().operationsStatus === "pass") {
-        set({ operationsApproved: true });
+    approveOperations: async () => {
+      if (get().operationsStatus !== "pass") {
+        return;
+      }
+      try {
+        if (get().refinedSequence) {
+          await get().actions.mergeToMaster();
+        }
+        await approveOperationsOnServer(currentProjectId());
+        set({ operationsApproved: true, operationsMessage: "Operations approved." });
+      } catch (err) {
+        set({
+          operationsApproved: false,
+          operationsMessage:
+            err instanceof Error
+              ? err.message
+              : "Failed to approve operations. Save the schematic first.",
+        });
       }
     },
     resetOperationsApproval: () => set({ operationsApproved: false }),
@@ -249,7 +273,7 @@ export const useOperationsStore = create<OperationsState>((set, get) => ({
       set({
         narrative,
         sequence,
-        refinedSequence: sequence,
+        refinedSequence: null,
         operationsApproved,
         operationsStatus: "idle",
         operationsIssues: [],

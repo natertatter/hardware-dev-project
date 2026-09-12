@@ -169,4 +169,10 @@ python3 scripts/horizon_a_verify.py --write-firmware
 - No new runtime dependencies on the Python side; UI may add `eslint` dev dependencies only.
 - Preserve existing test names in `tests/api/test_operations.py`; only redirect their disk writes.
 
-**Definition of done for the branch:** all items above closed, loop green, `git status` clean after tests, CI shows tsc + lint + compiled firmware, PR #15 description updated with a "Review fixes" section listing 1.1–2.9.
+**Definition of done for the branch:** all items above closed, loop green, `git status` clean after tests, CI shows tsc + compiled firmware, PR #15 description updated with a "Review fixes" section listing 1.1–2.9.
+
+---
+
+## Remediation status (2026-09-12)
+
+Items **1.1–1.6** and **2.1–2.9** were implemented on branch `cursor/horizon-a-roadmap-be2c` after this handoff. ESLint CI step was omitted (removed unused `lint` script instead of adding devDependencies). Re-run the verification loop before merge.

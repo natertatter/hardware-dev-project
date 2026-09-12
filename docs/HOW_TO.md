@@ -26,6 +26,8 @@ docker compose up --build
 # API: http://localhost:8000/health  (OpenAPI: /docs)
 ```
 
+The API image includes a seed `projects/demo_robot/` tree; Compose bind-mounts your host `projects/` and `generated/` over it for persistence.
+
 **Local dev (hot reload):**
 
 ```bash
@@ -71,7 +73,7 @@ NEXT_PUBLIC_API_URL=http://localhost:8000 npm run dev
 |------|--------|----------------|
 | 1 | **Generate Firmware** | Writes `generated/firmware/<project_id>/` (boot delays from ops when provided) |
 
-Use the toolbar **Project** selector to open disk-backed projects (default reference: `demo_robot`). **Save** writes `projects/<id>/schematic.json`; approvals update `metadata.json`. Operations drafts and master sequences continue to live under `projects/<id>/operations/`.
+Use the toolbar **Project** selector to open disk-backed projects (default reference: `demo_robot`). **Save** writes `projects/<id>/schematic.json` (placement-only canvases are allowed). **Approve** saves the schematic first, then sets `schematic_approved` in `metadata.json`. **Approve operations** calls `POST /api/v1/projects/<id>/operations/approve` after validation (requires schematic on disk). Operations drafts and master sequences live under `projects/<id>/operations/`.
 
 ---
 

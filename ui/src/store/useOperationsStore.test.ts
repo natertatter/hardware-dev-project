@@ -5,11 +5,12 @@ vi.mock("@/lib/api", () => ({
   refineOperations: vi.fn(),
   validateOperations: vi.fn(),
   mergeOperations: vi.fn(),
+  approveOperationsOnServer: vi.fn(),
 }));
 
 import { DEFAULT_PROJECT_ID } from "@/constants/project";
-import { saveOperationsDraft, refineOperations } from "@/lib/api";
-import { useOperationsStore } from "@/store/useOperationsStore";
+import { approveOperationsOnServer, saveOperationsDraft, refineOperations } from "@/lib/api";
+import { requiresOperationsApproval, useOperationsStore } from "@/store/useOperationsStore";
 import { useSchematicStore } from "@/store/useSchematicStore";
 
 const MCU_MANIFEST = {
@@ -171,6 +172,56 @@ describe("useOperationsStore", () => {
 
       const [inputSequence] = (refineOperations as any).mock.calls[0];
       expect(inputSequence.narrative).toBe("Enable power rail.");
+    });
+  });
+
+  describe("requiresOperationsApproval", () => {
+    it("returns false for narrative-only master with no steps", () => {
+      expect(
+        requiresOperationsApproval({
+          project_id: "p",
+          fidelity: "narrative",
+          version: 1,
+          steps: [],
+          open_questions: [],
+        }),
+      ).toBe(false);
+    });
+
+    it("returns true when steps exist", () => {
+      expect(
+        requiresOperationsApproval({
+          project_id: "p",
+          fidelity: "narrative",
+          version: 1,
+          steps: [{ step_id: "s1", description: "x" }],
+          open_questions: [],
+        }),
+      ).toBe(true);
+    });
+  });
+
+  describe("approveOperations", () => {
+    it("calls server approve endpoint on success", async () => {
+      (approveOperationsOnServer as any).mockResolvedValue({
+        project_id: DEFAULT_PROJECT_ID,
+        operations_approved: true,
+      });
+      useOperationsStore.setState({ operationsStatus: "pass" });
+
+      await useOperationsStore.getState().actions.approveOperations();
+
+      expect(approveOperationsOnServer).toHaveBeenCalledWith(DEFAULT_PROJECT_ID);
+      expect(useOperationsStore.getState().operationsApproved).toBe(true);
+    });
+
+    it("leaves approval false when server rejects", async () => {
+      (approveOperationsOnServer as any).mockRejectedValue(new Error("422"));
+      useOperationsStore.setState({ operationsStatus: "pass" });
+
+      await useOperationsStore.getState().actions.approveOperations();
+
+      expect(useOperationsStore.getState().operationsApproved).toBe(false);
     });
   });
 });

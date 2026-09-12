@@ -2,7 +2,7 @@
 
 Living plan for the EDA platform. **Implementation status** for the operations sequence system is recorded in [`docs/architecture/OPERATIONS_SEQUENCE.md`](architecture/OPERATIONS_SEQUENCE.md). **HTTP contracts** are in [`docs/architecture/API.md`](architecture/API.md).
 
-Last reviewed: 2026-09-12 (post-merge of operations + datasheet/protocol stacks on `main`).
+Last reviewed: 2026-09-12 (Horizon A review fixes: project id validation, draft-on-disk schematics, approval contract).
 
 ---
 
@@ -29,7 +29,7 @@ Last reviewed: 2026-09-12 (post-merge of operations + datasheet/protocol stacks 
 
 | ID | Work | Done when |
 |----|------|-----------|
-| A1 | Project persistence in UI | **Done** — toolbar project selector, load/save `schematic.json`, metadata on approve/save |
+| A1 | Project persistence in UI | **Done** — toolbar project selector, load/save `schematic.json`, schematic + operations approval persisted via API/metadata |
 | A2 | Documentation alignment | **Done** — HOW_TO, API, Compose notes updated |
 | A3 | Docker persistence | **Done** — `projects/` and `generated/` mounted in Compose |
 | A4 | CI baseline | **Done** — `.github/workflows/ci.yml` |

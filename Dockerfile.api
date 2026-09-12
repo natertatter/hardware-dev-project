@@ -5,6 +5,7 @@ WORKDIR /app
 COPY pyproject.toml README.md ./
 COPY src ./src
 COPY hardware_library ./hardware_library
+COPY projects/demo_robot ./projects/demo_robot
 
 RUN pip install --no-cache-dir -e .
 

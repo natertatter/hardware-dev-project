@@ -10,7 +10,7 @@ import {
   type NodeChange,
 } from "@xyflow/react";
 
-import { DEFAULT_PROJECT_ID } from "@/constants/project";
+import { DEFAULT_PROJECT_ID, PROJECT_ID_PATTERN } from "@/constants/project";
 import { COMPONENT_CATALOG } from "@/data/mockCatalog";
 import {
   autoWireProjectState,
@@ -25,7 +25,7 @@ import {
   validateProjectState,
 } from "@/lib/api";
 import type { CatalogEntry, HardwareNodeData, ProjectState } from "@/types/schemas";
-import { useOperationsStore } from "@/store/useOperationsStore";
+import { requiresOperationsApproval, useOperationsStore } from "@/store/useOperationsStore";
 import { buildSchematicDraft } from "@/utils/buildSchematicDraft";
 import { compileProjectState } from "@/utils/compileProjectState";
 import { decompileProjectState } from "@/utils/decompileProjectState";
@@ -64,6 +64,7 @@ interface SchematicState {
   projectIds: string[];
   projectStatus: ProjectPersistenceStatus;
   projectMessage: string | null;
+  lastSavedDraftHash: string | null;
   actions: {
     onNodesChange: (changes: NodeChange<Node<HardwareNodeData>>[]) => void;
     onEdgesChange: (changes: EdgeChange[]) => void;
@@ -73,7 +74,7 @@ interface SchematicState {
     loadCatalog: () => Promise<void>;
     validateArchitecture: () => Promise<void>;
     autoWire: () => Promise<void>;
-    approveSchematic: () => void;
+    approveSchematic: () => Promise<void>;
     resetApproval: () => void;
     generateFirmware: () => Promise<void>;
     refreshProjectList: () => Promise<void>;
@@ -114,6 +115,10 @@ function isUserDrivenNodeChange(changes: NodeChange<Node<HardwareNodeData>>[]): 
 
 function isUserDrivenEdgeChange(changes: EdgeChange[]): boolean {
   return changes.some((change) => change.type === "remove");
+}
+
+function draftPayloadHash(draft: ReturnType<typeof buildSchematicDraft>): string {
+  return JSON.stringify({ nodes: draft.nodes, nets: draft.nets });
 }
 
 function mockCatalogEntries(): CatalogEntry[] {
@@ -167,6 +172,7 @@ export const useSchematicStore = create<SchematicState>((set, get) => ({
   projectIds: [],
   projectStatus: "idle",
   projectMessage: null,
+  lastSavedDraftHash: null,
   actions: {
     onNodesChange: (changes) => {
       set({
@@ -357,19 +363,32 @@ export const useSchematicStore = create<SchematicState>((set, get) => ({
         });
       }
     },
-    approveSchematic: () => {
+    approveSchematic: async () => {
       if (get().validationStatus !== "pass") {
         return;
       }
-      set({ schematicApproved: true });
-      void (async () => {
-        try {
-          const metadata = await fetchProjectMetadata(get().projectId);
-          await saveProjectMetadata({ ...metadata, schematic_approved: true });
-        } catch {
-          // Approval still applies in-session when the API is offline.
-        }
-      })();
+      const { nodes, edges, projectId } = get();
+      set({ projectStatus: "saving", projectMessage: null });
+      try {
+        const draft = buildSchematicDraft(nodes, edges, projectId);
+        await saveProjectSchematic(draft);
+        const hash = draftPayloadHash(draft);
+        const metadata = await fetchProjectMetadata(projectId);
+        await saveProjectMetadata({ ...metadata, schematic_approved: true });
+        set({
+          schematicApproved: true,
+          lastSavedDraftHash: hash,
+          projectStatus: "idle",
+          projectMessage: "Schematic approved and saved.",
+        });
+      } catch (err) {
+        set({
+          schematicApproved: false,
+          projectStatus: "error",
+          projectMessage:
+            err instanceof Error ? err.message : "Could not save schematic before approval.",
+        });
+      }
     },
     resetApproval: () => set({ schematicApproved: false }),
     generateFirmware: async () => {
@@ -378,7 +397,7 @@ export const useSchematicStore = create<SchematicState>((set, get) => ({
       }
       const opsState = useOperationsStore.getState();
       const activeOps = opsState.actions.getActiveSequence();
-      if (activeOps && !opsState.operationsApproved) {
+      if (activeOps && requiresOperationsApproval(activeOps) && !opsState.operationsApproved) {
         set({
           firmwareStatus: "error",
           firmwareMessage: "Approve operations before generating firmware.",
@@ -415,7 +434,8 @@ export const useSchematicStore = create<SchematicState>((set, get) => ({
       }
     },
     loadProject: async (projectId) => {
-      set({ projectStatus: "loading", projectMessage: null, projectId });
+      const previousProjectId = get().projectId;
+      set({ projectStatus: "loading", projectMessage: null });
       try {
         await get().actions.refreshProjectList();
         const schematic = await fetchProjectSchematic(projectId);
@@ -423,8 +443,15 @@ export const useSchematicStore = create<SchematicState>((set, get) => ({
         const manifests = Object.fromEntries(
           catalog.map((entry) => [entry.manifest.component_id, entry.manifest]),
         );
-        const { nodes, edges } = decompileProjectState(schematic, manifests);
-        let metadata = await fetchProjectMetadata(projectId);
+        const { nodes, edges } = decompileProjectState(
+          {
+            project_id: schematic.project_id,
+            nodes: schematic.nodes,
+            nets: schematic.nets,
+          },
+          manifests,
+        );
+        const metadata = await fetchProjectMetadata(projectId);
         let operationsSequence = null;
         try {
           operationsSequence = await fetchOperationsMaster(projectId);
@@ -436,6 +463,7 @@ export const useSchematicStore = create<SchematicState>((set, get) => ({
           operationsSequence?.narrative ?? "",
           metadata.operations_approved,
         );
+        const hash = JSON.stringify({ nodes: schematic.nodes, nets: schematic.nets });
         set({
           nodes,
           edges,
@@ -443,6 +471,7 @@ export const useSchematicStore = create<SchematicState>((set, get) => ({
           projectStatus: "idle",
           projectMessage: `Loaded project "${projectId}".`,
           schematicApproved: metadata.schematic_approved,
+          lastSavedDraftHash: hash,
           validationStatus: "idle",
           validationIssues: [],
           validationMessage: null,
@@ -454,6 +483,7 @@ export const useSchematicStore = create<SchematicState>((set, get) => ({
         });
       } catch (err) {
         set({
+          projectId: previousProjectId,
           projectStatus: "error",
           projectMessage:
             err instanceof Error ? err.message : `Failed to load project "${projectId}".`,
@@ -461,21 +491,20 @@ export const useSchematicStore = create<SchematicState>((set, get) => ({
       }
     },
     saveProject: async () => {
-      const { nodes, edges, projectId } = get();
+      const { nodes, edges, projectId, lastSavedDraftHash } = get();
       set({ projectStatus: "saving", projectMessage: null });
       try {
         const draft = buildSchematicDraft(nodes, edges, projectId);
+        const hash = draftPayloadHash(draft);
+        const contentChanged = hash !== lastSavedDraftHash;
         await saveProjectSchematic(draft);
         await get().actions.refreshProjectList();
         set({
           projectStatus: "idle",
           projectMessage: `Saved projects/${projectId}/schematic.json`,
-          schematicApproved: false,
+          lastSavedDraftHash: hash,
+          ...(contentChanged ? { ...resetWorkflowState(), schematicApproved: false } : {}),
         });
-        const metadata = await fetchProjectMetadata(projectId);
-        if (metadata.schematic_approved) {
-          await saveProjectMetadata({ ...metadata, schematic_approved: false });
-        }
       } catch (err) {
         set({
           projectStatus: "error",
@@ -485,11 +514,18 @@ export const useSchematicStore = create<SchematicState>((set, get) => ({
     },
     createProject: (rawId) => {
       const projectId = rawId.trim().replace(/\s+/g, "_");
-      if (!/^[a-zA-Z][a-zA-Z0-9_-]*$/.test(projectId)) {
+      if (!PROJECT_ID_PATTERN.test(projectId)) {
         set({
           projectStatus: "error",
           projectMessage:
             "Project id must start with a letter and use only letters, numbers, underscores, or hyphens.",
+        });
+        return;
+      }
+      if (get().projectIds.includes(projectId)) {
+        set({
+          projectStatus: "error",
+          projectMessage: "Project already exists — select it from the list.",
         });
         return;
       }
@@ -498,6 +534,7 @@ export const useSchematicStore = create<SchematicState>((set, get) => ({
         projectId,
         nodes: [],
         edges: [],
+        lastSavedDraftHash: null,
         ...resetWorkflowState(),
         validationStatus: "idle",
         validationIssues: [],

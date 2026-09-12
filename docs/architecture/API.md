@@ -87,8 +87,8 @@ Clears the in-memory manifest cache so the next catalog read sees new parts.
 | Method | Path | Description |
 |--------|------|-------------|
 | GET | `/api/v1/projects` | List project ids that have `schematic.json` on disk. |
-| GET | `/api/v1/projects/{project_id}/schematic` | Load `schematic.json`. **404** if missing. |
-| PUT | `/api/v1/projects/{project_id}/schematic` | Save schematic from `SchematicDraft` (`nodes` required; `nets` may be empty — server adds a placeholder net for placement-only saves). Clears `schematic_approved` in metadata. |
+| GET | `/api/v1/projects/{project_id}/schematic` | Load `schematic.json` as `SchematicDraft` (`nets` may be empty). **404** if missing. **400** if `project_id` is invalid. |
+| PUT | `/api/v1/projects/{project_id}/schematic` | Save `SchematicDraft` as-is (placement-only saves keep `nets: []`). **400** on invalid `project_id`. When nodes/nets change, clears `schematic_approved` and `operations_approved` in metadata; identical saves preserve approvals. |
 | GET | `/api/v1/projects/{project_id}/metadata` | Load `metadata.json` or defaults for a new project. |
 | PUT | `/api/v1/projects/{project_id}/metadata` | Persist approval flags and fidelity stage. |
 

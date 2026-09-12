@@ -5,6 +5,7 @@ from fastapi import APIRouter, HTTPException
 from eda_platform.agents.architect.template_layout import template_auto_wire
 from eda_platform.api.manifest_loader import load_all_manifests
 from eda_platform.api.schemas import AutoWireRequest, AutoWireResponse
+from eda_platform.api.schematic_file import DRAFT_PLACEHOLDER_NET_ID
 from eda_platform.schemas import ComponentManifest, Net, NetConnection, NetType, PinType, ProjectState
 
 router = APIRouter(prefix="/api/v1", tags=["architect"])
@@ -35,7 +36,7 @@ def _draft_to_project_state(
         nodes=draft.nodes,
         nets=[
             Net(
-                net_id="_draft_placeholder",
+                net_id=DRAFT_PLACEHOLDER_NET_ID,
                 net_type=NetType.SIGNAL,
                 connections=[
                     NetConnection(node_id=first.node_id, pin_id=gnd_pin_id),
@@ -65,7 +66,7 @@ def auto_wire_schematic(body: AutoWireRequest) -> AutoWireResponse:
         updated_state = ProjectState(
             project_id=updated_state.project_id,
             nodes=updated_state.nodes,
-            nets=[n for n in updated_state.nets if n.net_id != "_draft_placeholder"],
+            nets=[n for n in updated_state.nets if n.net_id != DRAFT_PLACEHOLDER_NET_ID],
         )
 
     return AutoWireResponse(project_state=updated_state, wires_added=wires_added)

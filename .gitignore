@@ -21,3 +21,9 @@ generated/firmware/*/
 
 # Local dev log from start-eda-platform.bat
 .eda-api.log
+
+# Test / upload artifacts (seed data stays in git)
+projects/*/operations/drafts/
+projects/*/operations/refined/
+hardware_library/datasheets/*.pdf
+!hardware_library/datasheets/.gitkeep

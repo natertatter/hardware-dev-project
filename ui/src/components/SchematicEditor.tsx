@@ -18,7 +18,7 @@ import { HardwareNode } from "@/components/HardwareNode";
 import { DatasheetUpload } from "@/components/DatasheetUpload";
 import { OperationsPanel } from "@/components/OperationsPanel";
 import { ValidationPanel } from "@/components/ValidationPanel";
-import { useOperationsStore } from "@/store/useOperationsStore";
+import { requiresOperationsApproval, useOperationsStore } from "@/store/useOperationsStore";
 import { useSchematicStore } from "@/store/useSchematicStore";
 import type { CatalogEntry } from "@/types/schemas";
 
@@ -53,6 +53,7 @@ function SchematicCanvas() {
 
   const narrative = useOperationsStore((s) => s.narrative);
   const refinedSequence = useOperationsStore((s) => s.refinedSequence);
+  const activeOperations = useOperationsStore((s) => s.refinedSequence ?? s.sequence);
   const operationsStatus = useOperationsStore((s) => s.operationsStatus);
   const operationsIssues = useOperationsStore((s) => s.operationsIssues);
   const operationsMessage = useOperationsStore((s) => s.operationsMessage);
@@ -195,7 +196,7 @@ function SchematicCanvas() {
           </button>
           <button
             type="button"
-            onClick={() => actions.approveSchematic()}
+            onClick={() => void actions.approveSchematic()}
             disabled={validationStatus !== "pass" || schematicApproved}
             className="editor-shell__btn editor-shell__btn--approve"
           >
@@ -208,7 +209,7 @@ function SchematicCanvas() {
               !schematicApproved ||
               validationStatus !== "pass" ||
               firmwareStatus === "generating" ||
-              (refinedSequence != null && !operationsApproved)
+              (requiresOperationsApproval(activeOperations) && !operationsApproved)
             }
             className="editor-shell__btn editor-shell__btn--firmware"
           >
@@ -304,9 +305,9 @@ function SchematicCanvas() {
           <OperationsPanel
             narrative={narrative}
             onNarrativeChange={opsActions.setNarrative}
-            fidelity={refinedSequence?.fidelity ?? null}
+            fidelity={refinedSequence?.fidelity ?? activeOperations?.fidelity ?? null}
             refinedSteps={refinedSequence?.steps ?? []}
-            openQuestions={refinedSequence?.open_questions ?? []}
+            openQuestions={refinedSequence?.open_questions ?? activeOperations?.open_questions ?? []}
             status={operationsStatus}
             issues={operationsIssues}
             message={operationsMessage}
