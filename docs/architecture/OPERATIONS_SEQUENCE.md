@@ -54,7 +54,7 @@ Vibe/draft input
     → Operations Checker (cross-check vs ProjectState, manifests, scheduling plan)
     → Refined output (for human review)
     → Merge into master.json (on approval)
-    → Firmware Engineer (future: embed executable ops in generated code)
+    → Firmware Engineer (boot/init delays + operating docs today; runtime executable ops — see [`ROADMAP.md`](../ROADMAP.md) Horizon B)
 ```
 
 ### Operations Refiner (`src/eda_platform/agents/operations_refiner/`)
@@ -96,6 +96,10 @@ Mirrors Logic Checker pattern: individual rules + `validate_operations_collect()
 | POST | `/api/v1/operations/refine` | Refine sequence against ProjectState |
 | POST | `/api/v1/operations/validate` | Validate refined sequence |
 | POST | `/api/v1/operations/merge` | Promote refined → master (with version bump) |
+| POST | `/api/v1/operations/generate-docs` | Markdown operating procedure + bring-up checklist |
+| POST | `/api/v1/projects/{id}/operations/approve` | Persist operations approval in project metadata |
+
+Full request/response detail: [`API.md`](API.md).
 
 ## Orchestration (`src/eda_platform/orchestration/pipeline.py`)
 
@@ -119,44 +123,20 @@ Architect → Logic Checker → [Approve Schematic]
 
 Gate firmware on `metadata.schematic_approved` and `metadata.operations_approved` when an operations sequence is provided.
 
-## Implementation Phases
+## Delivery status (operations sequence v1)
 
-### Phase 1 — Foundation (this PR)
+The original phased plan (foundation → UI → librarian timing → firmware/docs → LLM refine) is **complete on `main`**.
 
-- [x] Pydantic schemas with fidelity levels
-- [x] Project loader (read/write master, drafts, refined, metadata)
-- [x] Operations Refiner (deterministic binding + best-practice timing)
-- [x] Operations Checker (structural + electrical cross-check rules)
-- [x] API routes for refine/validate/load/save/merge
-- [x] Orchestration pipeline skeleton
-- [x] Example fixtures: `projects/demo_robot/operations/`
-- [x] Unit + API tests
+| Capability | Status |
+|------------|--------|
+| Schemas, project loader, refiner, checker | Shipped |
+| HTTP API + `demo_robot` fixtures | Shipped |
+| UI `OperationsPanel` + approval gate on firmware | Shipped |
+| Manifest timing + `OperationalConstraints` | Shipped |
+| Boot delays in generated `main.c` + operating markdown | Shipped |
+| Optional LLM narrative refine (Anthropic BYOK) | Shipped |
 
-### Phase 2 — UI integration
-
-- [x] Operations editor panel (fidelity badge, refine/validate/approve buttons)
-- [x] `useOperationsStore` with draft capture and merge workflow
-- [x] TypeScript types mirroring backend schemas
-- [x] Draft capture from natural-language input field
-
-### Phase 3 — Librarian enrichment
-
-- [x] `OperationalConstraints` on `ComponentManifest` (`power_on_delay_ms`, `conversion_time_ms`, `i2c_max_clock_hz`)
-- [x] Refiner reads manifest timing fields via `manifest_timing.py`
-- [x] INA219 example manifest updated with datasheet values
-
-### Phase 4 — Firmware + operating docs
-
-- [x] Firmware Engineer embeds boot delays from operations in `main.c`
-- [x] Generate `OPERATING_PROCEDURE.md`, `BRINGUP_CHECKLIST.md` alongside firmware
-- [x] Dual approval gate: schematic + operations when operations sequence is provided
-- [x] `POST /api/v1/operations/generate-docs` endpoint
-
-### Phase 5 — LLM-assisted refinement
-
-- [x] Provider abstraction (`src/eda_platform/llm/provider.py`) with Anthropic BYOK
-- [x] Deterministic fallback when no API key configured
-- [x] Narrative parsing integrated into Operations Refiner
+**Not yet shipped:** embedding **runtime** executable operations in generated firmware (only boot/init one-shot delays). Planned under [`ROADMAP.md`](../ROADMAP.md) Horizon B.
 
 ## Cursor Workflow (end-to-end)
 
