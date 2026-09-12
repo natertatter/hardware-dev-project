@@ -1,9 +1,12 @@
 """Load and persist per-project artifacts (schematic, operations, metadata)."""
 
 import logging
+import re
 from datetime import datetime, timezone
 from pathlib import Path
 
+from eda_platform.api.schemas import SchematicDraft
+from eda_platform.api.schematic_file import strip_draft_nets
 from eda_platform.schemas import (
     OperationsSequence,
     ProjectMetadata,
@@ -15,13 +18,22 @@ logger = logging.getLogger(__name__)
 _REPO_ROOT = Path(__file__).resolve().parents[3]
 _PROJECTS_DIR = _REPO_ROOT / "projects"
 
+PROJECT_ID_PATTERN = re.compile(r"^[A-Za-z][A-Za-z0-9_-]{0,63}$")
+
+
+def validate_project_id(project_id: str) -> str:
+    if not project_id or not PROJECT_ID_PATTERN.fullmatch(project_id):
+        raise ValueError("invalid project_id")
+    return project_id
+
 
 def projects_directory() -> Path:
     return _PROJECTS_DIR
 
 
 def project_directory(project_id: str) -> Path:
-    return _PROJECTS_DIR / project_id
+    safe_id = validate_project_id(project_id)
+    return _PROJECTS_DIR / safe_id
 
 
 def operations_directory(project_id: str) -> Path:
@@ -36,21 +48,46 @@ def _ensure_project_dirs(project_id: str) -> Path:
     return ops_dir
 
 
-def load_project_state(project_id: str) -> ProjectState | None:
-    """Load schematic.json for a project, if present."""
+def load_schematic_draft(project_id: str) -> SchematicDraft | None:
+    """Load schematic.json as a draft (nets may be empty)."""
     path = project_directory(project_id) / "schematic.json"
     if not path.is_file():
         return None
-    return ProjectState.model_validate_json(path.read_text())
+    draft = SchematicDraft.model_validate_json(path.read_text())
+    return strip_draft_nets(draft)
+
+
+def load_project_state(project_id: str) -> ProjectState | None:
+    """Load a wired schematic as ProjectState, or None if missing or placement-only."""
+    draft = load_schematic_draft(project_id)
+    if draft is None or not draft.nets:
+        return None
+    return ProjectState(
+        project_id=draft.project_id,
+        nodes=draft.nodes,
+        nets=draft.nets,
+    )
+
+
+def save_schematic_draft(draft: SchematicDraft) -> Path:
+    """Persist schematic.json (placement-only drafts keep nets: [])."""
+    clean = strip_draft_nets(draft)
+    proj_dir = project_directory(clean.project_id)
+    proj_dir.mkdir(parents=True, exist_ok=True)
+    path = proj_dir / "schematic.json"
+    path.write_text(clean.model_dump_json(indent=2))
+    return path
 
 
 def save_project_state(project: ProjectState) -> Path:
-    """Persist ProjectState as schematic.json."""
-    proj_dir = project_directory(project.project_id)
-    proj_dir.mkdir(parents=True, exist_ok=True)
-    path = proj_dir / "schematic.json"
-    path.write_text(project.model_dump_json(indent=2))
-    return path
+    """Persist a fully wired ProjectState as schematic.json."""
+    return save_schematic_draft(
+        SchematicDraft(
+            project_id=project.project_id,
+            nodes=project.nodes,
+            nets=project.nets,
+        )
+    )
 
 
 def load_project_metadata(project_id: str) -> ProjectMetadata:
@@ -117,3 +154,14 @@ def list_operations_refined(project_id: str) -> list[Path]:
     if not refined_dir.is_dir():
         return []
     return sorted(refined_dir.glob("refined_v*.json"))
+
+
+def list_project_ids() -> list[str]:
+    """Return sorted project ids that have a schematic.json on disk."""
+    if not _PROJECTS_DIR.is_dir():
+        return []
+    ids: list[str] = []
+    for child in sorted(_PROJECTS_DIR.iterdir()):
+        if child.is_dir() and (child / "schematic.json").is_file():
+            ids.append(child.name)
+    return ids

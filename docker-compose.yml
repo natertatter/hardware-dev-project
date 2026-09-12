@@ -9,6 +9,8 @@ services:
       CORS_ORIGINS: "http://localhost:3000,http://127.0.0.1:3000"
     volumes:
       - ./hardware_library:/app/hardware_library:ro
+      - ./projects:/app/projects
+      - ./generated:/app/generated
 
   ui:
     image: node:20-alpine

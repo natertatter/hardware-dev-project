@@ -26,6 +26,8 @@ docker compose up --build
 # API: http://localhost:8000/health  (OpenAPI: /docs)
 ```
 
+The API image includes a seed `projects/demo_robot/` tree; Compose bind-mounts your host `projects/` and `generated/` over it for persistence.
+
 **Local dev (hot reload):**
 
 ```bash
@@ -38,7 +40,7 @@ NEXT_PUBLIC_API_URL=http://localhost:8000 npm run dev
 
 **Windows:** `start-eda-platform.bat` (waits for API health before opening the UI). Stop stuck servers: `start-eda-platform.bat stop`
 
-**Note:** Compose mounts `hardware_library` into the API container only. Project files under `projects/` and firmware under `generated/` are easiest to persist when running the API on the host — see roadmap **A3**.
+**Note:** Docker Compose mounts `hardware_library` (read-only), `projects/`, and `generated/` into the API container so saves and firmware output survive restarts.
 
 ---
 
@@ -71,7 +73,7 @@ NEXT_PUBLIC_API_URL=http://localhost:8000 npm run dev
 |------|--------|----------------|
 | 1 | **Generate Firmware** | Writes `generated/firmware/<project_id>/` (boot delays from ops when provided) |
 
-The UI currently uses a default in-memory `project_id` (`schematic_project`) and does not save `projects/<id>/schematic.json` automatically — use the API or edit files under `projects/` for disk-backed workflows (see `projects/demo_robot/`).
+Use the toolbar **Project** selector to open disk-backed projects (default reference: `demo_robot`). **Save** writes `projects/<id>/schematic.json` (placement-only canvases are allowed). **Approve** saves the schematic first, then sets `schematic_approved` in `metadata.json`. **Approve operations** calls `POST /api/v1/projects/<id>/operations/approve` after validation (requires schematic on disk). Operations drafts and master sequences live under `projects/<id>/operations/`.
 
 ---
 
@@ -129,9 +131,32 @@ Add manifests by dropping JSON into `manifests/` or using **Datasheet upload** i
 
 ## Tests
 
+### Automated loop (host — no Raspberry Pi)
+
+Run this after code changes or before opening a PR:
+
 ```bash
-python3 -m pytest -q          # backend
-cd ui && npm run test           # frontend (vitest)
+pip install -e ".[dev]"
+python3 -m pytest -q
+cd ui && npm install && npm run test
+python3 scripts/horizon_a_verify.py              # validate-only
+python3 scripts/horizon_a_verify.py --write-firmware   # + generate & make
 ```
 
-Counts change as tests are added; CI automation is planned (roadmap **A4**).
+GitHub Actions runs the same backend, UI, and `horizon_a_verify` steps on every PR.
+
+Optional — with API already running (`docker compose up` or `uvicorn …`):
+
+```bash
+python3 scripts/horizon_a_verify.py --live-api http://localhost:8000
+```
+
+### Cloud Agent / remote dev VM
+
+This repository’s Cloud Agent image can run the **host loop** above (pytest, vitest, `horizon_a_verify`). It does **not** include a Raspberry Pi; use [`firmware/PI4_HARDWARE_SMOKE.md`](firmware/PI4_HARDWARE_SMOKE.md) on real hardware after copying `generated/firmware/<project_id>/` to the board.
+
+For interactive UI testing in a remote environment, expose ports **3000** (UI) and **8000** (API) from `docker compose up` or run `npm run dev` + `uvicorn` and open the forwarded URLs shown in the agent dashboard.
+
+### Raspberry Pi hardware
+
+See **[`firmware/PI4_HARDWARE_SMOKE.md`](firmware/PI4_HARDWARE_SMOKE.md)** for wiring, `i2cdetect`, and `scripts/pi4_on_device_smoke.sh` on the device.

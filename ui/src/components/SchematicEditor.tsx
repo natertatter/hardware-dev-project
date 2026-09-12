@@ -10,13 +10,15 @@ import {
   ReactFlowProvider,
   useReactFlow,
 } from "@xyflow/react";
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+
+import { DEFAULT_PROJECT_ID } from "@/constants/project";
 
 import { HardwareNode } from "@/components/HardwareNode";
 import { DatasheetUpload } from "@/components/DatasheetUpload";
 import { OperationsPanel } from "@/components/OperationsPanel";
 import { ValidationPanel } from "@/components/ValidationPanel";
-import { useOperationsStore } from "@/store/useOperationsStore";
+import { requiresOperationsApproval, useOperationsStore } from "@/store/useOperationsStore";
 import { useSchematicStore } from "@/store/useSchematicStore";
 import type { CatalogEntry } from "@/types/schemas";
 
@@ -51,15 +53,29 @@ function SchematicCanvas() {
 
   const narrative = useOperationsStore((s) => s.narrative);
   const refinedSequence = useOperationsStore((s) => s.refinedSequence);
+  const activeOperations = useOperationsStore((s) => s.refinedSequence ?? s.sequence);
   const operationsStatus = useOperationsStore((s) => s.operationsStatus);
   const operationsIssues = useOperationsStore((s) => s.operationsIssues);
   const operationsMessage = useOperationsStore((s) => s.operationsMessage);
   const refineMessage = useOperationsStore((s) => s.refineMessage);
   const operationsApproved = useOperationsStore((s) => s.operationsApproved);
   const opsActions = useOperationsStore((s) => s.actions);
+  const projectId = useSchematicStore((s) => s.projectId);
+  const projectIds = useSchematicStore((s) => s.projectIds);
+  const projectStatus = useSchematicStore((s) => s.projectStatus);
+  const projectMessage = useSchematicStore((s) => s.projectMessage);
+  const [newProjectId, setNewProjectId] = useState("");
 
   useEffect(() => {
-    actions.loadCatalog();
+    void (async () => {
+      await actions.loadCatalog();
+      await actions.refreshProjectList();
+      const ids = useSchematicStore.getState().projectIds;
+      const initial = ids.includes(DEFAULT_PROJECT_ID) ? DEFAULT_PROJECT_ID : ids[0];
+      if (initial) {
+        await actions.loadProject(initial);
+      }
+    })();
   }, [actions]);
 
   const placeFromCatalog = useCallback(
@@ -106,6 +122,61 @@ function SchematicCanvas() {
             <p className="editor-shell__tagline">Industrial schematic lab</p>
           </div>
         </div>
+        <div className="editor-shell__project">
+          <label className="editor-shell__project-label" htmlFor="project-select">
+            Project
+          </label>
+          <select
+            id="project-select"
+            className="editor-shell__project-select"
+            value={projectId}
+            disabled={projectStatus === "loading"}
+            onChange={(e) => {
+              void actions.loadProject(e.target.value);
+            }}
+          >
+            {(projectIds.includes(projectId)
+              ? projectIds
+              : [...projectIds, projectId]
+            ).map((id) => (
+              <option key={id} value={id}>
+                {id}
+              </option>
+            ))}
+          </select>
+          <button
+            type="button"
+            className="editor-shell__btn editor-shell__btn--compact"
+            disabled={projectStatus === "saving" || projectStatus === "loading"}
+            onClick={() => void actions.saveProject()}
+          >
+            {projectStatus === "saving" ? "Saving…" : "Save"}
+          </button>
+          <div className="editor-shell__new-project">
+            <input
+              type="text"
+              className="editor-shell__project-input"
+              placeholder="new_project_id"
+              value={newProjectId}
+              onChange={(e) => setNewProjectId(e.target.value)}
+            />
+            <button
+              type="button"
+              className="editor-shell__btn editor-shell__btn--compact"
+              onClick={() => {
+                actions.createProject(newProjectId);
+                setNewProjectId("");
+              }}
+            >
+              New
+            </button>
+          </div>
+          {projectMessage && (
+            <p className="editor-shell__project-message" role="status">
+              {projectMessage}
+            </p>
+          )}
+        </div>
         <div className="editor-shell__actions">
           <button
             type="button"
@@ -124,7 +195,7 @@ function SchematicCanvas() {
           </button>
           <button
             type="button"
-            onClick={() => actions.approveSchematic()}
+            onClick={() => void actions.approveSchematic()}
             disabled={validationStatus !== "pass" || schematicApproved}
             className="editor-shell__btn editor-shell__btn--approve"
           >
@@ -137,7 +208,7 @@ function SchematicCanvas() {
               !schematicApproved ||
               validationStatus !== "pass" ||
               firmwareStatus === "generating" ||
-              (refinedSequence != null && !operationsApproved)
+              (requiresOperationsApproval(activeOperations) && !operationsApproved)
             }
             className="editor-shell__btn editor-shell__btn--firmware"
           >
@@ -233,9 +304,9 @@ function SchematicCanvas() {
           <OperationsPanel
             narrative={narrative}
             onNarrativeChange={opsActions.setNarrative}
-            fidelity={refinedSequence?.fidelity ?? null}
+            fidelity={refinedSequence?.fidelity ?? activeOperations?.fidelity ?? null}
             refinedSteps={refinedSequence?.steps ?? []}
-            openQuestions={refinedSequence?.open_questions ?? []}
+            openQuestions={refinedSequence?.open_questions ?? activeOperations?.open_questions ?? []}
             status={operationsStatus}
             issues={operationsIssues}
             message={operationsMessage}

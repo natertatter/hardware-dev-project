@@ -1,6 +1,12 @@
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
-import type { ComponentManifest, OperationsSequence, ProjectState } from "@/types/schemas";
+import type {
+  ComponentManifest,
+  OperationsSequence,
+  ProjectMetadata,
+  ProjectState,
+  SchematicDraft,
+} from "@/types/schemas";
 
 export interface ValidationIssue {
   rule: string;
@@ -155,6 +161,60 @@ export async function saveOperationsDraft(
   return apiFetch(`/api/v1/projects/${projectId}/operations/drafts`, {
     method: "POST",
     body: JSON.stringify({ operations }),
+  });
+}
+
+export async function listProjects(): Promise<string[]> {
+  const data = await apiFetch<{ project_ids: string[] }>("/api/v1/projects");
+  return data.project_ids;
+}
+
+export async function fetchProjectSchematic(projectId: string): Promise<SchematicDraft> {
+  const data = await apiFetch<{ schematic: SchematicDraft }>(
+    `/api/v1/projects/${projectId}/schematic`,
+  );
+  return data.schematic;
+}
+
+export async function saveProjectSchematic(draft: SchematicDraft): Promise<SchematicDraft> {
+  const data = await apiFetch<{ schematic: SchematicDraft }>(
+    `/api/v1/projects/${draft.project_id}/schematic`,
+    {
+      method: "PUT",
+      body: JSON.stringify(draft),
+    },
+  );
+  return data.schematic;
+}
+
+export async function fetchProjectMetadata(projectId: string): Promise<ProjectMetadata> {
+  const data = await apiFetch<{ metadata: ProjectMetadata }>(
+    `/api/v1/projects/${projectId}/metadata`,
+  );
+  return data.metadata;
+}
+
+export async function saveProjectMetadata(metadata: ProjectMetadata): Promise<ProjectMetadata> {
+  const data = await apiFetch<{ metadata: ProjectMetadata }>(
+    `/api/v1/projects/${metadata.project_id}/metadata`,
+    {
+      method: "PUT",
+      body: JSON.stringify({ metadata }),
+    },
+  );
+  return data.metadata;
+}
+
+export async function fetchOperationsMaster(projectId: string): Promise<OperationsSequence> {
+  return apiFetch<OperationsSequence>(`/api/v1/projects/${projectId}/operations/master`);
+}
+
+export async function approveOperationsOnServer(
+  projectId: string,
+): Promise<{ project_id: string; operations_approved: boolean }> {
+  return apiFetch(`/api/v1/projects/${projectId}/operations/approve`, {
+    method: "POST",
+    body: JSON.stringify({}),
   });
 }
 

@@ -40,7 +40,9 @@ export function decompileProjectState(
   const edges: Edge[] = [];
   let edgeCounter = 0;
 
-  for (const net of projectState.nets) {
+  const nets = projectState.nets.filter((net) => !net.net_id.startsWith("_draft_"));
+
+  for (const net of nets) {
     const conns = net.connections;
     // Chain connections within a net: A-B, B-C, ...
     for (let i = 0; i < conns.length - 1; i++) {

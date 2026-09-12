@@ -1,14 +1,16 @@
 import { create } from "zustand";
 
+import { DEFAULT_PROJECT_ID } from "@/constants/project";
 import {
+  approveOperationsOnServer,
   mergeOperations,
   refineOperations,
   saveOperationsDraft,
   validateOperations,
 } from "@/lib/api";
+import { useSchematicStore } from "@/store/useSchematicStore";
 import type { FidelityLevel, OperationsSequence } from "@/types/schemas";
 import { compileProjectState } from "@/utils/compileProjectState";
-import { useSchematicStore } from "@/store/useSchematicStore";
 
 export type OperationsStatus = "idle" | "refining" | "validating" | "pass" | "fail" | "error";
 
@@ -19,7 +21,17 @@ export interface OperationsIssueView {
   step_id?: string;
 }
 
-const DEFAULT_PROJECT_ID = "schematic_project";
+function currentProjectId(): string {
+  return useSchematicStore.getState().projectId || DEFAULT_PROJECT_ID;
+}
+
+/** True when firmware generation must wait for operations approval. */
+export function requiresOperationsApproval(sequence: OperationsSequence | null): boolean {
+  if (!sequence) {
+    return false;
+  }
+  return sequence.fidelity !== "narrative" || sequence.steps.length > 0;
+}
 
 function emptySequence(projectId: string): OperationsSequence {
   return {
@@ -46,19 +58,24 @@ interface OperationsState {
     captureDraft: () => Promise<void>;
     refine: () => Promise<void>;
     validate: () => Promise<void>;
-    mergeToMaster: () => Promise<void>;
-    approveOperations: () => void;
+    mergeToMaster: () => Promise<boolean>;
+    approveOperations: () => Promise<void>;
     resetOperationsApproval: () => void;
     getActiveSequence: () => OperationsSequence | null;
+    hydrateFromDisk: (
+      sequence: OperationsSequence | null,
+      narrative: string,
+      operationsApproved: boolean,
+    ) => void;
   };
 }
 
-function schematicProjectState() {
+function schematicProjectState(projectId?: string) {
   const { nodes, edges } = useSchematicStore.getState();
   if (nodes.length === 0) {
     throw new Error("Place components on the schematic before working with operations.");
   }
-  return compileProjectState(nodes, edges);
+  return compileProjectState(nodes, edges, projectId ?? currentProjectId());
 }
 
 export const useOperationsStore = create<OperationsState>((set, get) => ({
@@ -112,11 +129,12 @@ export const useOperationsStore = create<OperationsState>((set, get) => ({
         // placement-only canvas, blocking the exact light-fidelity, early
         // capture workflow this feature exists for. The project id is a
         // fixed constant across the single-project UI, so use it directly.
+        const projectId = currentProjectId();
         const draft: OperationsSequence = {
-          ...emptySequence(DEFAULT_PROJECT_ID),
+          ...emptySequence(projectId),
           narrative,
         };
-        await saveOperationsDraft(DEFAULT_PROJECT_ID, draft);
+        await saveOperationsDraft(projectId, draft);
         set({
           sequence: draft,
           operationsMessage: "Draft captured.",
@@ -213,7 +231,7 @@ export const useOperationsStore = create<OperationsState>((set, get) => ({
       const sequence = get().refinedSequence;
       if (!sequence) {
         set({ operationsMessage: "Refine operations before merging to master." });
-        return;
+        return false;
       }
       try {
         const projectState = schematicProjectState();
@@ -223,19 +241,56 @@ export const useOperationsStore = create<OperationsState>((set, get) => ({
           refinedSequence: result.master,
           operationsMessage: result.message,
         });
+        return true;
       } catch (err) {
         set({
           operationsMessage: err instanceof Error ? err.message : "Merge failed.",
         });
+        return false;
       }
     },
-    approveOperations: () => {
-      if (get().operationsStatus === "pass") {
-        set({ operationsApproved: true });
+    approveOperations: async () => {
+      if (get().operationsStatus !== "pass") {
+        return;
+      }
+      try {
+        if (get().refinedSequence) {
+          const merged = await get().actions.mergeToMaster();
+          if (!merged) {
+            set({
+              operationsApproved: false,
+              operationsMessage:
+                get().operationsMessage ?? "Merge to master failed — cannot approve operations.",
+            });
+            return;
+          }
+        }
+        await approveOperationsOnServer(currentProjectId());
+        set({ operationsApproved: true, operationsMessage: "Operations approved." });
+      } catch (err) {
+        set({
+          operationsApproved: false,
+          operationsMessage:
+            err instanceof Error
+              ? err.message
+              : "Failed to approve operations. Save the schematic first.",
+        });
       }
     },
     resetOperationsApproval: () => set({ operationsApproved: false }),
     getActiveSequence: () => get().refinedSequence ?? get().sequence,
+    hydrateFromDisk: (sequence, narrative, operationsApproved) => {
+      set({
+        narrative,
+        sequence,
+        refinedSequence: null,
+        operationsApproved,
+        operationsStatus: "idle",
+        operationsIssues: [],
+        operationsMessage: null,
+        refineMessage: null,
+      });
+    },
   },
 }));
 

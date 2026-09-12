@@ -2,7 +2,14 @@
 
 from pydantic import BaseModel, Field
 
-from eda_platform.schemas import ComponentManifest, Net, Node, OperationsSequence, ProjectState
+from eda_platform.schemas import (
+    ComponentManifest,
+    Net,
+    Node,
+    OperationsSequence,
+    ProjectMetadata,
+    ProjectState,
+)
 
 
 class SchematicDraft(BaseModel):
@@ -162,3 +169,19 @@ class UploadManifestResponse(BaseModel):
     manifest: ComponentManifest
     saved_path: str
     message: str
+
+
+class ProjectListResponse(BaseModel):
+    project_ids: list[str]
+
+
+class ProjectSchematicResponse(BaseModel):
+    schematic: SchematicDraft
+
+
+class ProjectMetadataResponse(BaseModel):
+    metadata: ProjectMetadata
+
+
+class SaveProjectMetadataRequest(BaseModel):
+    metadata: ProjectMetadata

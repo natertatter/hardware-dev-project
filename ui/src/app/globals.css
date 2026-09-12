@@ -107,6 +107,56 @@ body {
   text-transform: uppercase;
 }
 
+.editor-shell__project {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 1;
+  justify-content: center;
+  min-width: 0;
+}
+
+.editor-shell__project-label {
+  font-size: 0.6875rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.editor-shell__project-select,
+.editor-shell__project-input {
+  font: inherit;
+  font-size: 0.8125rem;
+  padding: 0.35rem 0.5rem;
+  border: 1px solid var(--lab-border);
+  border-radius: var(--radius-sm);
+  background: var(--lab-bg);
+  color: var(--text-primary);
+  max-width: 10rem;
+}
+
+.editor-shell__new-project {
+  display: flex;
+  gap: 0.35rem;
+  align-items: center;
+}
+
+.editor-shell__project-message {
+  margin: 0;
+  font-size: 0.6875rem;
+  color: var(--text-muted);
+  max-width: 14rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.editor-shell__btn--compact {
+  padding: 0.35rem 0.65rem;
+  font-size: 0.75rem;
+}
+
 .editor-shell__actions {
   display: flex;
   flex-wrap: wrap;

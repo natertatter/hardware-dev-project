@@ -5,10 +5,17 @@ vi.mock("@/lib/api", () => ({
   refineOperations: vi.fn(),
   validateOperations: vi.fn(),
   mergeOperations: vi.fn(),
+  approveOperationsOnServer: vi.fn(),
 }));
 
-import { saveOperationsDraft, refineOperations } from "@/lib/api";
-import { useOperationsStore } from "@/store/useOperationsStore";
+import { DEFAULT_PROJECT_ID } from "@/constants/project";
+import {
+  approveOperationsOnServer,
+  mergeOperations,
+  refineOperations,
+  saveOperationsDraft,
+} from "@/lib/api";
+import { requiresOperationsApproval, useOperationsStore } from "@/store/useOperationsStore";
 import { useSchematicStore } from "@/store/useSchematicStore";
 
 const MCU_MANIFEST = {
@@ -36,7 +43,7 @@ function placedNode(id: string) {
 describe("useOperationsStore", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    useSchematicStore.setState({ nodes: [], edges: [] });
+    useSchematicStore.setState({ nodes: [], edges: [], projectId: DEFAULT_PROJECT_ID });
     useOperationsStore.setState({
       narrative: "",
       sequence: null,
@@ -66,13 +73,13 @@ describe("useOperationsStore", () => {
 
       expect(saveOperationsDraft).toHaveBeenCalledTimes(1);
       const [projectId, draft] = (saveOperationsDraft as any).mock.calls[0];
-      expect(projectId).toBe("schematic_project");
+      expect(projectId).toBe(DEFAULT_PROJECT_ID);
       expect(draft.narrative).toBe("Enable power rail.");
       expect(useOperationsStore.getState().operationsMessage).toBe("Draft captured.");
     });
 
     it("reports a clear message instead of throwing when no nodes are placed", async () => {
-      useSchematicStore.setState({ nodes: [], edges: [] });
+      useSchematicStore.setState({ nodes: [], edges: [], projectId: DEFAULT_PROJECT_ID });
       useOperationsStore.setState({ narrative: "Enable power rail." });
 
       await expect(
@@ -170,6 +177,80 @@ describe("useOperationsStore", () => {
 
       const [inputSequence] = (refineOperations as any).mock.calls[0];
       expect(inputSequence.narrative).toBe("Enable power rail.");
+    });
+  });
+
+  describe("requiresOperationsApproval", () => {
+    it("returns false for narrative-only master with no steps", () => {
+      expect(
+        requiresOperationsApproval({
+          project_id: "p",
+          fidelity: "narrative",
+          version: 1,
+          steps: [],
+          open_questions: [],
+        }),
+      ).toBe(false);
+    });
+
+    it("returns true when steps exist", () => {
+      expect(
+        requiresOperationsApproval({
+          project_id: "p",
+          fidelity: "narrative",
+          version: 1,
+          steps: [{ step_id: "s1", description: "x" }],
+          open_questions: [],
+        }),
+      ).toBe(true);
+    });
+  });
+
+  describe("approveOperations", () => {
+    it("calls server approve endpoint on success", async () => {
+      (approveOperationsOnServer as any).mockResolvedValue({
+        project_id: DEFAULT_PROJECT_ID,
+        operations_approved: true,
+      });
+      useOperationsStore.setState({ operationsStatus: "pass" });
+
+      await useOperationsStore.getState().actions.approveOperations();
+
+      expect(approveOperationsOnServer).toHaveBeenCalledWith(DEFAULT_PROJECT_ID);
+      expect(useOperationsStore.getState().operationsApproved).toBe(true);
+    });
+
+    it("leaves approval false when server rejects", async () => {
+      (approveOperationsOnServer as any).mockRejectedValue(new Error("422"));
+      useOperationsStore.setState({ operationsStatus: "pass" });
+
+      await useOperationsStore.getState().actions.approveOperations();
+
+      expect(useOperationsStore.getState().operationsApproved).toBe(false);
+    });
+
+    it("does not call server approve when merge to master fails", async () => {
+      (mergeOperations as any).mockRejectedValue(new Error("merge failed"));
+      useOperationsStore.setState({
+        operationsStatus: "pass",
+        refinedSequence: {
+          project_id: DEFAULT_PROJECT_ID,
+          fidelity: "steps",
+          version: 1,
+          steps: [{ step_id: "s1", description: "x" }],
+          open_questions: [],
+        },
+      });
+      useSchematicStore.setState({
+        nodes: [placedNode("mcu_1")],
+        edges: [],
+        projectId: DEFAULT_PROJECT_ID,
+      });
+
+      await useOperationsStore.getState().actions.approveOperations();
+
+      expect(approveOperationsOnServer).not.toHaveBeenCalled();
+      expect(useOperationsStore.getState().operationsApproved).toBe(false);
     });
   });
 });

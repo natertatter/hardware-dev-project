@@ -64,6 +64,8 @@ make
 sudo ./<project_id>_firmware   # requires I2C enabled (raspi-config)
 ```
 
+Host verification (Horizon A) and Pi hardware checklist: [`docs/firmware/PI4_HARDWARE_SMOKE.md`](docs/firmware/PI4_HARDWARE_SMOKE.md) · `python3 scripts/horizon_a_verify.py --write-firmware`
+
 ## Project layout
 
 | Directory | Responsibility |

@@ -2,7 +2,7 @@
 
 Living plan for the EDA platform. **Implementation status** for the operations sequence system is recorded in [`docs/architecture/OPERATIONS_SEQUENCE.md`](architecture/OPERATIONS_SEQUENCE.md). **HTTP contracts** are in [`docs/architecture/API.md`](architecture/API.md).
 
-Last reviewed: 2026-09-12 (post-merge of operations + datasheet/protocol stacks on `main`).
+Last reviewed: 2026-09-12 (Horizon A review fixes: project id validation, draft-on-disk schematics, approval contract).
 
 ---
 
@@ -17,7 +17,7 @@ Last reviewed: 2026-09-12 (post-merge of operations + datasheet/protocol stacks 
 | Operations | v1 | Refiner, checker, API, UI panel, optional LLM, operating docs |
 | Firmware Engineer | v1 (Pi 4) | pthreads + I2C sensors; boot delays from operations; runtime executable ops not yet |
 | UI | v1 | React Flow editor, catalog, protocols, datasheet upload, operations sidebar |
-| CI / deploy | Early | Docker Compose demo; no GitHub Actions workflow yet |
+| CI / deploy | v1 | Docker Compose with `projects/` + `generated/` mounts; GitHub Actions runs `pytest` and UI `vitest` |
 
 **North star:** datasheet → schematic → validate → behavioral operations → trustworthy firmware and runbooks, with explicit human approval gates.
 
@@ -29,11 +29,11 @@ Last reviewed: 2026-09-12 (post-merge of operations + datasheet/protocol stacks 
 
 | ID | Work | Done when |
 |----|------|-----------|
-| A1 | Project persistence in UI | Load/save `projects/<id>/schematic.json` and `metadata.json`; stable project id (today the canvas often uses in-memory `schematic_project`) |
-| A2 | Documentation alignment | User guides match product (this doc set) |
-| A3 | Docker persistence | Document or mount `projects/` and `generated/` in Compose |
-| A4 | CI baseline | `pytest` + UI `vitest` on every PR |
-| A5 | Pi hardware smoke | Scripted or checklist validation on real board |
+| A1 | Project persistence in UI | **Done** — toolbar project selector, load/save `schematic.json`, schematic + operations approval persisted via API/metadata |
+| A2 | Documentation alignment | **Done** — HOW_TO, API, Compose notes updated |
+| A3 | Docker persistence | **Done** — `projects/` and `generated/` mounted in Compose |
+| A4 | CI baseline | **Done** — `.github/workflows/ci.yml` |
+| A5 | Pi hardware smoke | **Done** — [`docs/firmware/PI4_HARDWARE_SMOKE.md`](firmware/PI4_HARDWARE_SMOKE.md), `scripts/horizon_a_verify.py`, `scripts/pi4_on_device_smoke.sh` |
 
 ---
 
@@ -97,8 +97,8 @@ Authentication, multi-project tenancy, hosted deploy (TLS), pipeline observabili
 
 ## Suggested order
 
-1. **A1, A4, A2** (persistence, CI, docs)
-2. **A5** (hardware proof)
+1. ~~**A1, A4, A2** (persistence, CI, docs)~~ — complete
+2. ~~**A5** (hardware proof)~~ — host script + Pi checklist complete
 3. **B1, B3** (executable ops + docs UX)
 4. **C1** (Librarian v2)
 5. **E1** (motors on Pi)

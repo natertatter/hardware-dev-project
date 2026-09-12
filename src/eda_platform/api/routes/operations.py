@@ -1,6 +1,8 @@
 """Operations sequence API routes."""
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
+
+from eda_platform.api.deps import project_id_path
 
 from eda_platform.agents.operations_docs import (
     generate_bringup_checklist,
@@ -42,7 +44,7 @@ def _resolve_manifests(body_manifests):
 
 
 @router.get("/projects/{project_id}/operations/master")
-def get_operations_master(project_id: str) -> OperationsSequence:
+def get_operations_master(project_id: str = Depends(project_id_path)) -> OperationsSequence:
     master = load_operations_master(project_id)
     if master is None:
         raise HTTPException(status_code=404, detail=f"no operations master for '{project_id}'")
@@ -50,7 +52,10 @@ def get_operations_master(project_id: str) -> OperationsSequence:
 
 
 @router.put("/projects/{project_id}/operations/master")
-def put_operations_master(project_id: str, body: OperationsSequence) -> OperationsSequence:
+def put_operations_master(
+    body: OperationsSequence,
+    project_id: str = Depends(project_id_path),
+) -> OperationsSequence:
     if body.project_id != project_id:
         raise HTTPException(
             status_code=400,
@@ -62,7 +67,8 @@ def put_operations_master(project_id: str, body: OperationsSequence) -> Operatio
 
 @router.post("/projects/{project_id}/operations/drafts", response_model=SaveOperationsDraftResponse)
 def post_operations_draft(
-    project_id: str, body: SaveOperationsDraftRequest
+    body: SaveOperationsDraftRequest,
+    project_id: str = Depends(project_id_path),
 ) -> SaveOperationsDraftResponse:
     if body.operations.project_id != project_id:
         raise HTTPException(
@@ -165,7 +171,7 @@ def merge_operations_endpoint(body: MergeOperationsRequest) -> MergeOperationsRe
 
 
 @router.post("/projects/{project_id}/operations/approve")
-def approve_operations_endpoint(project_id: str) -> dict:
+def approve_operations_endpoint(project_id: str = Depends(project_id_path)) -> dict:
     master = load_operations_master(project_id)
     if master is None:
         raise HTTPException(status_code=404, detail=f"no operations master for '{project_id}'")
