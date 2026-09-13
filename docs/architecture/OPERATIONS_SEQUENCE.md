@@ -54,7 +54,7 @@ Vibe/draft input
     → Operations Checker (cross-check vs ProjectState, manifests, scheduling plan)
     → Refined output (for human review)
     → Merge into master.json (on approval)
-    → Firmware Engineer (boot/init delays + operating docs today; runtime executable ops — see [`ROADMAP.md`](../ROADMAP.md) Horizon B)
+    → Firmware Engineer (boot/init delays + operating docs; runtime ops interpreter in review — see ROADMAP.md Horizon B)
 ```
 
 ### Operations Refiner (`src/eda_platform/agents/operations_refiner/`)
@@ -98,6 +98,7 @@ Mirrors Logic Checker pattern: individual rules + `validate_operations_collect()
 | POST | `/api/v1/operations/merge` | Promote refined → master (with version bump) |
 | POST | `/api/v1/operations/generate-docs` | Markdown operating procedure + bring-up checklist |
 | POST | `/api/v1/projects/{id}/operations/approve` | Persist operations approval in project metadata |
+| POST | `/api/v1/pipeline/run` | Staged schematic validate → ops gates → firmware generate |
 
 Full request/response detail: [`API.md`](API.md).
 
@@ -135,8 +136,12 @@ The original phased plan (foundation → UI → librarian timing → firmware/do
 | Manifest timing + `OperationalConstraints` | Shipped |
 | Boot delays in generated `main.c` + operating markdown | Shipped |
 | Optional LLM narrative refine (Anthropic BYOK) | Shipped |
+| Runtime ops interpreter (`runtime/ops_interpreter`, dedicated timer task) | Shipped (Horizon B1) — honors `period_ms`, `hal_call` (when bound), `depends_on` order |
+| Codegen fidelity gates for `executable` | Shipped (Horizon B2) — refuse + degrade notes below `executable` |
+| Operating docs preview in UI after firmware | Shipped (Horizon B3) |
+| Staged `POST /pipeline/run` orchestration | Shipped (Horizon B4) — metadata approvals, disk master load, optional `refine` |
 
-**Not yet shipped:** embedding **runtime** executable operations in generated firmware (only boot/init one-shot delays). Planned under [`ROADMAP.md`](../ROADMAP.md) Horizon B.
+**Runtime limits (documented):** non-boot one-shot delays without `period_ms` are reported in the firmware message but not emitted; `condition` steps are skipped (degrade note) or block `executable` fidelity; unbound `hal_call` strings emit `UNRESOLVED` stubs. See tests in `tests/agents/test_firmware_operations.py` and `tests/agents/test_operations_runtime.py`.
 
 ## Cursor Workflow (end-to-end)
 

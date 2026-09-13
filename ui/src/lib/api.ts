@@ -81,6 +81,21 @@ export async function autoWireProjectState(
   });
 }
 
+export interface GenerateOperatingDocsResponse {
+  operating_procedure: string;
+  bringup_checklist: string;
+}
+
+export async function generateOperatingDocs(
+  operations: OperationsSequence,
+  projectState: ProjectState,
+): Promise<GenerateOperatingDocsResponse> {
+  return apiFetch<GenerateOperatingDocsResponse>("/api/v1/operations/generate-docs", {
+    method: "POST",
+    body: JSON.stringify({ operations, project_state: projectState }),
+  });
+}
+
 export async function generateFirmware(
   projectState: ProjectState,
   approved: boolean,

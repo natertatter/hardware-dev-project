@@ -47,6 +47,9 @@ function SchematicCanvas() {
   const firmwareStatus = useSchematicStore((s) => s.firmwareStatus);
   const firmwareOutputDir = useSchematicStore((s) => s.firmwareOutputDir);
   const firmwareMessage = useSchematicStore((s) => s.firmwareMessage);
+  const operatingProcedureMd = useSchematicStore((s) => s.operatingProcedureMd);
+  const bringupChecklistMd = useSchematicStore((s) => s.bringupChecklistMd);
+  const operatingDocsMessage = useSchematicStore((s) => s.operatingDocsMessage);
   const actions = useSchematicStore((s) => s.actions);
   const { screenToFlowPosition } = useReactFlow();
   const canvasRef = useRef<HTMLElement>(null);
@@ -328,6 +331,9 @@ function SchematicCanvas() {
             firmwareStatus={firmwareStatus}
             firmwareOutputDir={firmwareOutputDir}
             firmwareMessage={firmwareMessage}
+            operatingProcedureMd={operatingProcedureMd}
+            bringupChecklistMd={bringupChecklistMd}
+            operatingDocsMessage={operatingDocsMessage}
           />
         </aside>
       </div>

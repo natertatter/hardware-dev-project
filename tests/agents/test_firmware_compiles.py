@@ -13,8 +13,44 @@ from pathlib import Path
 import pytest
 
 from eda_platform.agents.firmware_engineer import generate_firmware
+from eda_platform.schemas import FidelityLevel, OperationStep, OperationsSequence, TimingConstraint
 from tests.data.mock_data import mock_manifests
 from tests.test_logic_checker import _valid_project_state
+
+
+def _runtime_operations() -> OperationsSequence:
+    return OperationsSequence(
+        project_id="valid_i2c_wiring",
+        fidelity=FidelityLevel.TIMED,
+        steps=[
+            OperationStep(
+                step_id="run2",
+                description="Log bus current every second",
+                hal_call="hal_sensor_read()",
+                target_node_id="sensor_1",
+                timing=TimingConstraint(period_ms=1000),
+            ),
+        ],
+    )
+
+
+def _hostile_description_operations() -> OperationsSequence:
+    return OperationsSequence(
+        project_id="valid_i2c_wiring",
+        fidelity=FidelityLevel.TIMED,
+        steps=[
+            OperationStep(
+                step_id="evil",
+                description=r'Ramp to 100% then log %s and %d values',
+                timing=TimingConstraint(period_ms=1000),
+            ),
+            OperationStep(
+                step_id="evil2",
+                description=r"Wait for path C:\dev\estop release",
+                timing=TimingConstraint(delay_ms=500),
+            ),
+        ],
+    )
 
 _HAS_TOOLCHAIN = shutil.which("gcc") is not None and shutil.which("make") is not None
 
@@ -23,7 +59,12 @@ pytestmark = pytest.mark.skipif(
 )
 
 
-def test_generated_firmware_compiles_with_werror(tmp_path: Path):
+@pytest.mark.parametrize(
+    "operations",
+    [None, _runtime_operations(), _hostile_description_operations()],
+    ids=["no_ops", "runtime_ops", "hostile_descriptions"],
+)
+def test_generated_firmware_compiles_with_werror(tmp_path: Path, operations):
     """Build every generated .c file with -Wall -Wextra -Werror.
 
     Regression target: task_sensor_poll.c previously ignored the return
@@ -36,6 +77,8 @@ def test_generated_firmware_compiles_with_werror(tmp_path: Path):
         _valid_project_state(),
         mock_manifests(),
         approved=True,
+        operations=operations,
+        operations_approved=operations is not None,
         output_root=tmp_path,
     )
     project_dir = tmp_path / result.project_id

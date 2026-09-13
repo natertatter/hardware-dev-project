@@ -1,6 +1,7 @@
 """C code templates for Raspberry Pi 4 pthreads firmware."""
 
 from eda_platform.agents.firmware_engineer.models import SchedulingPlan
+from eda_platform.agents.firmware_engineer.operations_runtime import RuntimePlan
 from eda_platform.agents.firmware_engineer.pin_map import (
     I2C_BUS_NUMBER,
     I2C_DEVICE_PATH,
@@ -9,6 +10,16 @@ from eda_platform.agents.firmware_engineer.pin_map import (
 
 _FALLBACK_SDA_BCM = 2
 _FALLBACK_SCL_BCM = 3
+
+
+def c_string_literal(text: str) -> str:
+    """Escape text for use inside a C string literal."""
+    return (
+        text.replace("\\", "\\\\")
+        .replace('"', '\\"')
+        .replace("\n", "\\n")
+        .replace("\t", "\\t")
+    )
 
 
 def board_config_h(
@@ -177,6 +188,114 @@ int {hal}_read_current_ma(float *current_ma) {{
 """
 
 
+def ops_interpreter_h() -> str:
+    return """/* Operations sequence runtime interpreter (generated) */
+#ifndef OPS_INTERPRETER_H
+#define OPS_INTERPRETER_H
+
+void ops_runtime_on_poll_tick(void);
+
+#endif
+"""
+
+
+def ops_interpreter_c(plan: RuntimePlan, sensors: list[dict]) -> str:
+    if not plan.periodic_steps:
+        return """/* Operations sequence runtime interpreter (generated) */
+#include "ops_interpreter.h"
+
+void ops_runtime_on_poll_tick(void) {
+}
+"""
+
+    hal_includes = "\n".join(
+        f'#include "../hal/{s["hal_module"]}.h"' for s in sensors
+    )
+    state_rows = "\n".join(
+        f'    {{"{step.step_id}", {step.period_ms}, 0}},' for step in plan.periodic_steps
+    )
+    step_funcs = []
+    switch_cases = []
+    for index, step in enumerate(plan.periodic_steps):
+        step_funcs.append(f"static void ops_run_{index}(void) {{\n{step.c_body}\n}}\n")
+        switch_cases.append(f"            case {index}: ops_run_{index}(); break;")
+
+    return f"""/* Operations sequence runtime interpreter (generated) */
+#include <stdint.h>
+#include <stdio.h>
+#include <time.h>
+
+#include "ops_interpreter.h"
+{hal_includes}
+
+static uint64_t now_ms(void) {{
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return (uint64_t)ts.tv_sec * 1000ULL + (uint64_t)ts.tv_nsec / 1000000ULL;
+}}
+
+typedef struct {{
+    const char *step_id;
+    unsigned period_ms;
+    uint64_t next_due_ms;
+}} ops_periodic_t;
+
+static ops_periodic_t ops_periodic[] = {{
+{state_rows}
+}};
+
+{"".join(step_funcs)}
+void ops_runtime_on_poll_tick(void) {{
+    uint64_t now = now_ms();
+    for (size_t i = 0; i < sizeof(ops_periodic) / sizeof(ops_periodic[0]); i++) {{
+        if (now < ops_periodic[i].next_due_ms) {{
+            continue;
+        }}
+        switch (i) {{
+{chr(10).join(switch_cases)}
+        }}
+        ops_periodic[i].next_due_ms = now + ops_periodic[i].period_ms;
+    }}
+}}
+"""
+
+
+def task_operations_runtime_c(plan: RuntimePlan) -> str:
+    tick = plan.tick_period_ms
+    return f"""/* Auto-generated runtime operations task (timerfd + pthread) */
+#include <pthread.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <sys/timerfd.h>
+#include <time.h>
+#include <unistd.h>
+
+#include "../platform/board_config.h"
+#include "../runtime/ops_interpreter.h"
+
+#define OPS_RUNTIME_TICK_MS {tick}
+
+void *task_operations_runtime(void *arg) {{
+    (void)arg;
+    int tfd = timerfd_create(CLOCK_MONOTONIC, 0);
+    struct itimerspec spec = {{
+        .it_interval = {{OPS_RUNTIME_TICK_MS / 1000, (OPS_RUNTIME_TICK_MS % 1000) * 1000000L}},
+        .it_value = {{OPS_RUNTIME_TICK_MS / 1000, (OPS_RUNTIME_TICK_MS % 1000) * 1000000L}},
+    }};
+    timerfd_settime(tfd, 0, &spec, NULL);
+
+    uint64_t expirations;
+    for (;;) {{
+        if (read(tfd, &expirations, sizeof(expirations)) < 0) {{
+            continue;
+        }}
+        ops_runtime_on_poll_tick();
+    }}
+    return NULL;
+}}
+"""
+
+
 def task_sensor_poll_c(sensors: list[dict]) -> str:
     inits = "\n    ".join(f"{s['hal_module']}_init();" for s in sensors)
     reads = "\n        ".join(
@@ -240,6 +359,7 @@ def main_c(
     plan: SchedulingPlan,
     sensors: list[dict],
     boot_delays: list[tuple[int, str]] | None = None,
+    spawn_operations_runtime: bool = False,
 ) -> str:
     has_sensor_poll = any(t.task_id == "task_sensor_poll" for t in plan.tasks)
     has_background = any(t.task_id == "task_background" for t in plan.tasks)
@@ -256,13 +376,22 @@ def main_c(
     background_spawn = (
         '    spawn_thread(task_background, "task_background");' if has_background else ""
     )
+    has_ops_runtime = spawn_operations_runtime
+    ops_runtime_extern = (
+        "    extern void *task_operations_runtime(void *);" if has_ops_runtime else ""
+    )
+    ops_runtime_spawn = (
+        '    spawn_thread(task_operations_runtime, "task_operations_runtime");'
+        if has_ops_runtime
+        else ""
+    )
 
     boot_lines = ""
     if boot_delays:
         for ms, comment in boot_delays:
-            safe_comment = comment.replace('"', "'")
+            safe_comment = c_string_literal(comment)
             boot_lines += (
-                f'    printf("[boot] {safe_comment} ({ms} ms)\\n");\n'
+                f'    printf("[boot] %s (%d ms)\\n", "{safe_comment}", {ms});\n'
                 f"    usleep({ms * 1000});\n"
             )
 
@@ -304,6 +433,8 @@ int main(void) {{
 {sensor_poll_spawn}
 {background_extern}
 {background_spawn}
+{ops_runtime_extern}
+{ops_runtime_spawn}
 
     /* Thin supervisor — no hardware logic in main */
     for (;;) {{
@@ -315,14 +446,23 @@ int main(void) {{
 """
 
 
-def makefile(project_id: str, sensors: list[dict]) -> str:
+def makefile(
+    project_id: str, sensors: list[dict], *, include_operations_runtime: bool = False
+) -> str:
     hal_objs = " ".join(f"hal/{s['hal_module']}.o" for s in sensors)
+    runtime_objs = ""
+    runtime_rules = ""
+    if include_operations_runtime:
+        runtime_objs = " runtime/ops_interpreter.o tasks/task_operations_runtime.o"
+        runtime_rules = """
+runtime/ops_interpreter.o: runtime/ops_interpreter.c runtime/ops_interpreter.h
+tasks/task_operations_runtime.o: tasks/task_operations_runtime.c runtime/ops_interpreter.h"""
     return f"""# Auto-generated Makefile for {project_id} on Raspberry Pi 4
 CC = gcc
-CFLAGS = -Wall -Wextra -O2 -pthread -I.
+CFLAGS = -Wall -Wextra -Werror -O2 -pthread -I.
 LDFLAGS = -pthread
 
-OBJS = main.o hal/hal_i2c_bus_0.o tasks/task_sensor_poll.o tasks/task_background.o {hal_objs}
+OBJS = main.o hal/hal_i2c_bus_0.o tasks/task_sensor_poll.o tasks/task_background.o{runtime_objs} {hal_objs}
 
 TARGET = {project_id}_firmware
 
@@ -335,6 +475,7 @@ main.o: main.c platform/board_config.h
 hal/hal_i2c_bus_0.o: hal/hal_i2c_bus_0.c hal/hal_i2c_bus_0.h
 tasks/task_sensor_poll.o: tasks/task_sensor_poll.c
 tasks/task_background.o: tasks/task_background.c
+{runtime_rules}
 {chr(10).join(f"hal/{s['hal_module']}.o: hal/{s['hal_module']}.c hal/{s['hal_module']}.h" for s in sensors)}
 
 clean:

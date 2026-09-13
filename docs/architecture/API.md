@@ -109,6 +109,12 @@ Project artifacts live under `projects/<project_id>/` (`schematic.json`, `metada
 | POST | `/api/v1/operations/merge` | `MergeOperationsRequest`: refined `operations`, optional `project_state` (loaded from disk if omitted), `bump_version`. Validates before promoting to master. **422** if validation fails. |
 | POST | `/api/v1/operations/generate-docs` | `GenerateOperatingDocsRequest`: `operations`, `project_state`. Returns markdown strings for operating procedure and bring-up checklist (does not write files; firmware generate also emits docs when operations are passed). |
 
+### Staged pipeline (Horizon B4)
+
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/api/v1/pipeline/run` | `PipelineRunRequest`: `project_state`, optional `manifests`, optional `operations` (loads `operations/master.json` from disk when omitted), `refine` / `persist_refine`, `allow_unapproved` (default false — when false, schematic and operations approval come from `metadata.json`). Runs schematic validation → optional refine/validate/approve ops → firmware generation. Returns **200** with `success: false` when stopped at an approval gate; **422** if manifests are missing. |
+
 **LLM:** Refinement can use Anthropic when configured (`pip install -e ".[llm]"` and API key in env); otherwise deterministic fallback.
 
 ---

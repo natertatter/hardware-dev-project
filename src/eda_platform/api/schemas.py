@@ -185,3 +185,31 @@ class ProjectMetadataResponse(BaseModel):
 
 class SaveProjectMetadataRequest(BaseModel):
     metadata: ProjectMetadata
+
+
+class PipelineRunRequest(BaseModel):
+    project_state: ProjectState
+    operations: OperationsSequence | None = None
+    manifests: dict[str, ComponentManifest] | None = None
+    refine: bool = False
+    persist_refine: bool = False
+    allow_unapproved: bool = Field(
+        default=False,
+        description="When true, use schematic_approved/operations_approved from this body instead of metadata.json",
+    )
+    schematic_approved: bool = False
+    operations_approved: bool = False
+
+
+class PipelineStageResult(BaseModel):
+    stage: str
+    success: bool
+    message: str
+
+
+class PipelineRunResponse(BaseModel):
+    success: bool
+    message: str
+    stages: list[PipelineStageResult]
+    firmware_output_dir: str | None = None
+    firmware_files_written: list[str] = Field(default_factory=list)
