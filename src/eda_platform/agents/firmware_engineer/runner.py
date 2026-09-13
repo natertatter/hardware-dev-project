@@ -51,6 +51,11 @@ def generate_firmware(
                 raise FirmwareEngineerError(
                     "executable fidelity blocked — steps still marked needs_refinement"
                 )
+            conditioned = [s for s in operations.steps if s.condition]
+            if conditioned:
+                raise FirmwareEngineerError(
+                    "executable fidelity blocked — runtime conditions are not yet implemented"
+                )
         else:
             needs_work = [s for s in operations.steps if s.needs_refinement]
             if needs_work:

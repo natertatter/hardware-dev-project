@@ -229,11 +229,15 @@ def build_runtime_plan(
 
 
 def boot_delay_steps(operations: OperationsSequence | None) -> list[tuple[int, str]]:
-    """Boot-only delays for main() — one-shot at startup, not recurring runtime."""
-    if operations is None:
+    """Boot-only delays for main() — one-shot at startup, not recurring runtime.
+
+    Steps are emitted in ``depends_on`` topological order so boot sequencing
+    matches the operations graph when delays are present.
+    """
+    if operations is None or not operations.steps:
         return []
     out: list[tuple[int, str]] = []
-    for step in operations.steps:
+    for step in _topo_sort_steps(list(operations.steps)):
         if step.timing and step.timing.delay_ms and is_boot_step(step.description):
             out.append((step.timing.delay_ms, step.description))
     return out

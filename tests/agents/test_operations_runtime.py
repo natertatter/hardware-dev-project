@@ -139,3 +139,49 @@ def test_step_classification_matrix(delay_ms, period_ms, hal_call, boot_word, ex
         assert "x" in deferred_ids
     elif expected_bucket == "periodic":
         assert "x" in periodic_ids
+
+
+def test_depends_on_orders_periodic_steps():
+    ops = OperationsSequence(
+        project_id="p",
+        fidelity=FidelityLevel.TIMED,
+        steps=[
+            OperationStep(
+                step_id="b",
+                description="Poll sensor",
+                target_node_id="sensor_1",
+                hal_call="hal_sensor_read()",
+                timing=TimingConstraint(period_ms=500),
+                depends_on=["a"],
+            ),
+            OperationStep(
+                step_id="a",
+                description="Poll sensor baseline",
+                target_node_id="sensor_1",
+                hal_call="hal_sensor_read()",
+                timing=TimingConstraint(period_ms=1000),
+            ),
+        ],
+    )
+    plan, _ = build_runtime_plan(ops, _sensors())
+    assert [s.step_id for s in plan.periodic_steps] == ["a", "b"]
+
+
+def test_condition_steps_reported_not_emitted():
+    ops = OperationsSequence(
+        project_id="p",
+        fidelity=FidelityLevel.TIMED,
+        steps=[
+            OperationStep(
+                step_id="guard",
+                description="Poll sensor when estop released",
+                condition="estop released",
+                target_node_id="sensor_1",
+                hal_call="hal_sensor_read()",
+                timing=TimingConstraint(period_ms=1000),
+            ),
+        ],
+    )
+    plan, notes = build_runtime_plan(ops, _sensors())
+    assert plan.periodic_steps == []
+    assert notes.conditioned_step_ids == ["guard"]

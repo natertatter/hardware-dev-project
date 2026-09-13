@@ -15,7 +15,7 @@ Last reviewed: 2026-09-13 (Horizon B senior review — first implementation not 
 | Systems Architect | v1 | Deterministic template auto-wire (I2C bus, multi-MCU UART/USB serial) |
 | Hardware Librarian | v1 | Upload JSON or PDF; PDF → template manifest (full LLM extraction not yet) |
 | Operations | v1 | Refiner, checker, API, UI panel, optional LLM, operating docs |
-| Firmware Engineer | v1 (Pi 4) | pthreads + I2C sensors; boot delays from operations; runtime ops interpreter in review (Horizon B) |
+| Firmware Engineer | v1 (Pi 4) | pthreads + I2C sensors; boot delays + runtime ops interpreter for timed/executable sequences |
 | UI | v1 | React Flow editor, catalog, protocols, datasheet upload, operations sidebar |
 | CI / deploy | v1 | Docker Compose with `projects/` + `generated/` mounts; GitHub Actions runs `pytest` and UI `vitest` |
 
@@ -41,14 +41,14 @@ Last reviewed: 2026-09-13 (Horizon B senior review — first implementation not 
 
 **Goal:** Operations sequences at `timed` / `executable` fidelity drive **runtime** firmware, not only boot delays and markdown docs.
 
-**Status: remediation on `cursor/horizon-b-be2c` (PR #16).** Senior review findings addressed in follow-up commits; see [`docs/reviews/HORIZON_B_SENIOR_REVIEW.md`](reviews/HORIZON_B_SENIOR_REVIEW.md) for the original defect list.
-
 | ID | Work | Done when |
 |----|------|-----------|
-| B1 | Runtime operations interpreter | **Partial** — `operations_runtime.py` + emitted `runtime/ops_interpreter`, but `period_ms`, `hal_call`, `depends_on`, and `condition` are not yet honored |
-| B2 | Codegen fidelity gates | **Partial** — `runner.py` refuses `executable` on open questions / `needs_refinement`; degrade path incomplete |
-| B3 | Operating docs in UI | **Partial** — post-firmware `generate-docs` preview in Validation panel; previews go stale across projects |
-| B4 | Orchestration endpoint | **Partial** — `POST /api/v1/pipeline/run`; no refine stage, and approval gates do not consult project metadata |
+| B1 | Runtime operations interpreter | **Done** — `operations_runtime.py`, `runtime/ops_interpreter`, `task_operations_runtime` (`period_ms`, bound `hal_call`, `depends_on` order; see runtime limits in [`OPERATIONS_SEQUENCE.md`](architecture/OPERATIONS_SEQUENCE.md)) |
+| B2 | Codegen fidelity gates | **Done** — refuse `executable` on open questions / `needs_refinement` / `condition`; degrade below `executable` |
+| B3 | Operating docs in UI | **Done** — post-firmware `generate-docs` preview + reset on workflow change |
+| B4 | Orchestration endpoint | **Done** — `POST /api/v1/pipeline/run` (metadata approvals, load master, optional `refine`) |
+
+Senior review history: [`docs/reviews/HORIZON_B_SENIOR_REVIEW.md`](reviews/HORIZON_B_SENIOR_REVIEW.md).
 
 ---
 
@@ -101,7 +101,7 @@ Authentication, multi-project tenancy, hosted deploy (TLS), pipeline observabili
 
 1. ~~**A1, A4, A2** (persistence, CI, docs)~~ — complete
 2. ~~**A5** (hardware proof)~~ — host script + Pi checklist complete
-3. **B1–B4** — first pass implemented, remediation pending senior review
+3. ~~**B1–B4** (executable ops + docs UX + pipeline)~~ — complete
 4. **C1** (Librarian v2)
 5. **E1** (motors on Pi)
 6. **D2 / D3**, then **E3**

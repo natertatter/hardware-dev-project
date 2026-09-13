@@ -136,11 +136,12 @@ The original phased plan (foundation → UI → librarian timing → firmware/do
 | Manifest timing + `OperationalConstraints` | Shipped |
 | Boot delays in generated `main.c` + operating markdown | Shipped |
 | Optional LLM narrative refine (Anthropic BYOK) | Shipped |
-| Runtime ops interpreter (`runtime/ops_interpreter`, poll hook) | In review (Horizon B1) |
-| Codegen fidelity gates for `executable` | In review (Horizon B2) |
-| Staged `POST /pipeline/run` orchestration | In review (Horizon B4) |
+| Runtime ops interpreter (`runtime/ops_interpreter`, dedicated timer task) | Shipped (Horizon B1) — honors `period_ms`, `hal_call` (when bound), `depends_on` order |
+| Codegen fidelity gates for `executable` | Shipped (Horizon B2) — refuse + degrade notes below `executable` |
+| Operating docs preview in UI after firmware | Shipped (Horizon B3) |
+| Staged `POST /pipeline/run` orchestration | Shipped (Horizon B4) — metadata approvals, disk master load, optional `refine` |
 
-**Horizon B caveat:** the first implementation emits a runtime interpreter but does not yet honor `period_ms`, `hal_call`, `depends_on`, or `condition`, and `/pipeline/run` has no refine stage. Blocking defects and remediation steps are in [`../reviews/HORIZON_B_SENIOR_REVIEW.md`](../reviews/HORIZON_B_SENIOR_REVIEW.md).
+**Runtime limits (documented):** non-boot one-shot delays without `period_ms` are reported in the firmware message but not emitted; `condition` steps are skipped (degrade note) or block `executable` fidelity; unbound `hal_call` strings emit `UNRESOLVED` stubs. See tests in `tests/agents/test_firmware_operations.py` and `tests/agents/test_operations_runtime.py`.
 
 ## Cursor Workflow (end-to-end)
 

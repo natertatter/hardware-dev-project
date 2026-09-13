@@ -132,3 +132,62 @@ class TestFirmwareWithOperations:
         assert "ops_runtime_" not in (
             tmp_path / "valid_i2c_wiring" / "tasks" / "task_sensor_poll.c"
         ).read_text()
+
+    def test_depends_on_emitted_step_order(self, tmp_path: Path):
+        ops = OperationsSequence(
+            project_id="valid_i2c_wiring",
+            fidelity=FidelityLevel.TIMED,
+            steps=[
+                OperationStep(
+                    step_id="b",
+                    description="Poll sensor",
+                    target_node_id="sensor_1",
+                    hal_call="hal_sensor_read()",
+                    timing=TimingConstraint(period_ms=500),
+                    depends_on=["a"],
+                ),
+                OperationStep(
+                    step_id="a",
+                    description="Poll sensor baseline",
+                    target_node_id="sensor_1",
+                    hal_call="hal_sensor_read()",
+                    timing=TimingConstraint(period_ms=1000),
+                ),
+            ],
+        )
+        generate_firmware(
+            _valid_project_state(),
+            mock_manifests(),
+            approved=True,
+            operations=ops,
+            operations_approved=True,
+            output_root=tmp_path,
+        )
+        runtime_c = (tmp_path / "valid_i2c_wiring" / "runtime" / "ops_interpreter.c").read_text()
+        assert runtime_c.find('"a"') < runtime_c.find('"b"')
+        assert "ops_run_0" in runtime_c and "ops_run_1" in runtime_c
+
+    def test_condition_degrade_in_message(self, tmp_path: Path):
+        ops = OperationsSequence(
+            project_id="valid_i2c_wiring",
+            fidelity=FidelityLevel.TIMED,
+            steps=[
+                OperationStep(
+                    step_id="guard",
+                    description="Poll when safe",
+                    condition="estop released",
+                    target_node_id="sensor_1",
+                    hal_call="hal_sensor_read()",
+                    timing=TimingConstraint(period_ms=1000),
+                ),
+            ],
+        )
+        result = generate_firmware(
+            _valid_project_state(),
+            mock_manifests(),
+            approved=True,
+            operations=ops,
+            operations_approved=True,
+            output_root=tmp_path,
+        )
+        assert "condition" in result.message.lower()

@@ -10,6 +10,7 @@ from eda_platform.schemas import (
     OpenQuestion,
     OperationStep,
     OperationsSequence,
+    TimingConstraint,
 )
 from tests.data.mock_data import mock_manifests
 from tests.test_logic_checker import _valid_project_state
@@ -48,6 +49,29 @@ def test_timed_open_questions_degrade_note(tmp_path: Path):
         output_root=tmp_path,
     )
     assert "open question" in result.message.lower()
+
+
+def test_executable_blocked_by_runtime_condition():
+    ops = OperationsSequence(
+        project_id="valid_i2c_wiring",
+        fidelity=FidelityLevel.EXECUTABLE,
+        steps=[
+            OperationStep(
+                step_id="s1",
+                description="Poll sensor",
+                condition="estop released",
+                timing=TimingConstraint(period_ms=1000),
+            )
+        ],
+    )
+    with pytest.raises(FirmwareEngineerError, match="conditions"):
+        generate_firmware(
+            _valid_project_state(),
+            mock_manifests(),
+            approved=True,
+            operations=ops,
+            operations_approved=True,
+        )
 
 
 def test_executable_blocked_by_needs_refinement():
