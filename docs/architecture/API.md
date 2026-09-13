@@ -113,7 +113,7 @@ Project artifacts live under `projects/<project_id>/` (`schematic.json`, `metada
 
 | Method | Path | Description |
 |--------|------|-------------|
-| POST | `/api/v1/pipeline/run` | `PipelineRunRequest`: `project_state`, optional `manifests`, optional `operations`, `schematic_approved` (default true), `operations_approved` (default false). Runs schematic validation → optional operations validation/approval gates → firmware generation. Returns per-stage results and firmware paths when successful. **422** if manifests are missing. |
+| POST | `/api/v1/pipeline/run` | `PipelineRunRequest`: `project_state`, optional `manifests`, optional `operations` (loads `operations/master.json` from disk when omitted), `refine` / `persist_refine`, `allow_unapproved` (default false — when false, schematic and operations approval come from `metadata.json`). Runs schematic validation → optional refine/validate/approve ops → firmware generation. Returns **200** with `success: false` when stopped at an approval gate; **422** if manifests are missing. |
 
 **LLM:** Refinement can use Anthropic when configured (`pip install -e ".[llm]"` and API key in env); otherwise deterministic fallback.
 

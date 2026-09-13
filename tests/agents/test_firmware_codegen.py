@@ -12,7 +12,7 @@ def test_generate_source_files_contains_expected_artifacts():
     project = _valid_project_state()
     manifests = mock_manifests()
     plan = plan_from_project(project, manifests)
-    files = generate_source_files(project, manifests, plan)
+    files, _notes = generate_source_files(project, manifests, plan)
 
     assert "main.c" in files
     assert "Makefile" in files
@@ -30,7 +30,7 @@ def test_emit_firmware_tree_writes_files(tmp_path: Path):
     manifests = mock_manifests()
     plan = plan_from_project(project, manifests)
 
-    written = emit_firmware_tree(tmp_path, project, manifests, plan)
+    written, _notes = emit_firmware_tree(tmp_path, project, manifests, plan)
     assert len(written) >= 7
     assert (tmp_path / "main.c").is_file()
     assert (tmp_path / "hal" / "hal_sensor_1.c").is_file()

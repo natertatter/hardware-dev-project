@@ -39,29 +39,37 @@ def generate_firmware(
         issues = "; ".join(e.message for e in validation.errors[:3])
         raise FirmwareEngineerError(f"validation failed: {issues}")
 
-    fidelity_note = ""
+    degrade_parts: list[str] = []
     if operations is not None:
-        if operations.fidelity == FidelityLevel.EXECUTABLE and operations.open_questions:
-            raise FirmwareEngineerError(
-                "executable fidelity blocked — resolve open questions before generating firmware"
-            )
-        needs_work = [s for s in operations.steps if s.needs_refinement]
-        if operations.fidelity == FidelityLevel.EXECUTABLE and needs_work:
-            raise FirmwareEngineerError(
-                "executable fidelity blocked — steps still marked needs_refinement"
-            )
-        if needs_work and operations.fidelity != FidelityLevel.EXECUTABLE:
-            fidelity_note = (
-                f" (degraded: {len(needs_work)} step(s) still need refinement)"
-            )
+        if operations.fidelity == FidelityLevel.EXECUTABLE:
+            if operations.open_questions:
+                raise FirmwareEngineerError(
+                    "executable fidelity blocked — resolve open questions before generating firmware"
+                )
+            needs_work = [s for s in operations.steps if s.needs_refinement]
+            if needs_work:
+                raise FirmwareEngineerError(
+                    "executable fidelity blocked — steps still marked needs_refinement"
+                )
+        else:
+            needs_work = [s for s in operations.steps if s.needs_refinement]
+            if needs_work:
+                degrade_parts.append(
+                    f"{len(needs_work)} step(s) still need refinement"
+                )
+            if operations.open_questions:
+                degrade_parts.append(
+                    f"{len(operations.open_questions)} open question(s) unresolved"
+                )
 
     plan = plan_from_project(project, manifests)
     out_root = output_root or _DEFAULT_OUTPUT_ROOT
     output_dir = out_root / project.project_id
 
-    files_written = emit_firmware_tree(
+    files_written, runtime_notes = emit_firmware_tree(
         output_dir, project, manifests, plan, operations=operations
     )
+    degrade_parts.extend(runtime_notes.degrade_fragments())
 
     if operations is not None:
         doc_files = emit_operating_docs(output_dir, operations, project)
@@ -78,5 +86,8 @@ def generate_firmware(
         output_dir=rel_output,
         files_written=files_written,
         scheduling_plan=plan,
-        message=f"Generated {len(files_written)} files for Raspberry Pi 4{fidelity_note}",
+        message=(
+            f"Generated {len(files_written)} files for Raspberry Pi 4"
+            + (f" (degraded: {'; '.join(degrade_parts)})" if degrade_parts else "")
+        ),
     )

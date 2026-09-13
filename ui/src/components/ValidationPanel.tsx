@@ -17,6 +17,7 @@ interface ValidationPanelProps {
   firmwareMessage: string | null;
   operatingProcedureMd: string | null;
   bringupChecklistMd: string | null;
+  operatingDocsMessage: string | null;
 }
 
 function statusPillClass(kind: "idle" | "pending" | "pass" | "fail" | "error"): string {
@@ -85,6 +86,7 @@ export function ValidationPanel({
   firmwareMessage,
   operatingProcedureMd,
   bringupChecklistMd,
+  operatingDocsMessage,
 }: ValidationPanelProps) {
   const validation = validationPill(status);
   const autoWire = autoWirePill(autoWireStatus);
@@ -138,6 +140,9 @@ export function ValidationPanel({
         {firmwareMessage && <p className="panel-card__message">{firmwareMessage}</p>}
         {firmwareOutputDir && (
           <p className="editor-shell__banner editor-shell__banner--output">{firmwareOutputDir}</p>
+        )}
+        {operatingDocsMessage && (
+          <p className="panel-card__message">{operatingDocsMessage}</p>
         )}
         {operatingProcedureMd && (
           <details className="panel-card__docs">

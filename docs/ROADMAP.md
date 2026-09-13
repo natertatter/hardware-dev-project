@@ -41,7 +41,7 @@ Last reviewed: 2026-09-13 (Horizon B senior review — first implementation not 
 
 **Goal:** Operations sequences at `timed` / `executable` fidelity drive **runtime** firmware, not only boot delays and markdown docs.
 
-**Status: in review.** First implementation is on `cursor/horizon-b-be2c` (PR #16) and is **not** accepted — see [`docs/reviews/HORIZON_B_SENIOR_REVIEW.md`](reviews/HORIZON_B_SENIOR_REVIEW.md) for the blocking defects.
+**Status: remediation on `cursor/horizon-b-be2c` (PR #16).** Senior review findings addressed in follow-up commits; see [`docs/reviews/HORIZON_B_SENIOR_REVIEW.md`](reviews/HORIZON_B_SENIOR_REVIEW.md) for the original defect list.
 
 | ID | Work | Done when |
 |----|------|-----------|

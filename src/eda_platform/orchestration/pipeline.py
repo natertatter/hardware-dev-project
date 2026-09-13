@@ -131,12 +131,23 @@ def run_staged_pipeline(
     manifests: dict[str, ComponentManifest],
     *,
     operations: OperationsSequence | None = None,
-    schematic_approved: bool = True,
+    schematic_approved: bool = False,
     operations_approved: bool = False,
     output_root: Path | None = None,
+    refine: bool = False,
+    persist_refine: bool = False,
+    use_metadata_approvals: bool = True,
 ) -> PipelineRunResult:
-    """Validate schematic → operations (optional) → generate firmware."""
+    """Validate schematic → optional refine/validate ops → generate firmware."""
     stages: list[PipelineResult] = []
+
+    if use_metadata_approvals:
+        metadata = load_project_metadata(project.project_id)
+        schematic_approved = metadata.schematic_approved
+        operations_approved = metadata.operations_approved
+
+    if operations is None:
+        operations = load_operations_master(project.project_id)
 
     schematic_validation = validate_project_collect(project, manifests)
     stages.append(
@@ -163,7 +174,23 @@ def run_staged_pipeline(
         )
         return PipelineRunResult(success=False, stages=stages, message="schematic approval required")
 
-    if operations is not None:
+    if operations is None:
+        stages.append(
+            PipelineResult(
+                stage=PipelineStage.OPERATIONS_VALIDATE,
+                success=True,
+                message="no operations master on disk — firmware generated from schematic only",
+            )
+        )
+    else:
+        if refine:
+            refine_result = run_operations_refine(
+                operations, project, manifests, persist=persist_refine
+            )
+            stages.append(refine_result)
+            if refine_result.refine_result is not None:
+                operations = refine_result.refine_result.refined
+
         ops_result = run_operations_validate(operations, project, manifests)
         stages.append(ops_result)
         if not ops_result.success:
@@ -188,9 +215,9 @@ def run_staged_pipeline(
         fw = generate_firmware(
             project,
             manifests,
-            approved=True,
+            approved=schematic_approved,
             operations=operations,
-            operations_approved=operations_approved,
+            operations_approved=operations_approved if operations is not None else False,
             output_root=output_root,
         )
     except FirmwareEngineerError as exc:

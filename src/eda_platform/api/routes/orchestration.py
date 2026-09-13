@@ -21,6 +21,9 @@ def run_pipeline(body: PipelineRunRequest) -> PipelineRunResponse:
         operations=body.operations,
         schematic_approved=body.schematic_approved,
         operations_approved=body.operations_approved,
+        refine=body.refine,
+        persist_refine=body.persist_refine,
+        use_metadata_approvals=not body.allow_unapproved,
     )
 
     return PipelineRunResponse(

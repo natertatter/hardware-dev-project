@@ -20,6 +20,11 @@ def isolated_projects_dir(tmp_path_factory: pytest.TempPathFactory) -> Path:
 
 
 @pytest.fixture(scope="session")
+def isolated_firmware_output_dir(tmp_path_factory: pytest.TempPathFactory) -> Path:
+    return tmp_path_factory.mktemp("generated_firmware")
+
+
+@pytest.fixture(scope="session")
 def isolated_datasheets_dir(tmp_path_factory: pytest.TempPathFactory) -> Path:
     root = tmp_path_factory.mktemp("datasheets")
     keep = REPO_ROOT / "hardware_library" / "datasheets" / ".gitkeep"
@@ -32,10 +37,13 @@ def isolated_datasheets_dir(tmp_path_factory: pytest.TempPathFactory) -> Path:
 def _redirect_project_and_datasheet_dirs(
     isolated_projects_dir: Path,
     isolated_datasheets_dir: Path,
+    isolated_firmware_output_dir: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    import eda_platform.agents.firmware_engineer.runner as firmware_runner
     import eda_platform.agents.librarian.ingest as ingest
     import eda_platform.api.project_loader as project_loader
 
     monkeypatch.setattr(project_loader, "_PROJECTS_DIR", isolated_projects_dir)
     monkeypatch.setattr(ingest, "_DATASHEETS_DIR", isolated_datasheets_dir)
+    monkeypatch.setattr(firmware_runner, "_DEFAULT_OUTPUT_ROOT", isolated_firmware_output_dir)

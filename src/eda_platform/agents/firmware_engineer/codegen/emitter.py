@@ -5,6 +5,7 @@ from pathlib import Path
 from eda_platform.agents.firmware_engineer.codegen import templates
 from eda_platform.agents.firmware_engineer.models import SchedulingPlan
 from eda_platform.agents.firmware_engineer.operations_runtime import (
+    RuntimeCodegenNotes,
     boot_delay_steps,
     build_runtime_plan,
 )
@@ -72,11 +73,11 @@ def generate_source_files(
     manifests: dict[str, ComponentManifest],
     plan: SchedulingPlan,
     operations: OperationsSequence | None = None,
-) -> dict[str, str]:
+) -> tuple[dict[str, str], RuntimeCodegenNotes]:
     """Return relative path → file contents for the full firmware tree."""
     sensors = _sensor_nodes(plan, project, manifests)
     sda_pin_id, scl_pin_id = _mcu_i2c_pins(project, manifests)
-    runtime_plan = build_runtime_plan(operations)
+    runtime_plan, codegen_notes = build_runtime_plan(operations, sensors)
     files: dict[str, str] = {}
 
     files["platform/board_config.h"] = templates.board_config_h(plan, sda_pin_id, scl_pin_id)
@@ -88,13 +89,11 @@ def generate_source_files(
         files[f"hal/{hal}.h"] = templates.hal_ina219_h(sensor)
         files[f"hal/{hal}.c"] = templates.hal_ina219_c(sensor)
 
-    files["tasks/task_sensor_poll.c"] = templates.task_sensor_poll_c(
-        sensors, include_runtime_tick=bool(runtime_plan.periodic_steps)
-    )
+    files["tasks/task_sensor_poll.c"] = templates.task_sensor_poll_c(sensors)
     files["tasks/task_background.c"] = templates.task_background_c()
     if runtime_plan.has_runtime_work:
         files["runtime/ops_interpreter.h"] = templates.ops_interpreter_h()
-        files["runtime/ops_interpreter.c"] = templates.ops_interpreter_c(runtime_plan)
+        files["runtime/ops_interpreter.c"] = templates.ops_interpreter_c(runtime_plan, sensors)
         files["tasks/task_operations_runtime.c"] = templates.task_operations_runtime_c(
             runtime_plan
         )
@@ -102,13 +101,13 @@ def generate_source_files(
         plan,
         sensors,
         boot_delays=boot_delay_steps(operations),
-        spawn_operations_runtime=runtime_plan.startup_delays,
+        spawn_operations_runtime=runtime_plan.has_runtime_work,
     )
     files["Makefile"] = templates.makefile(
         project.project_id, sensors, include_operations_runtime=runtime_plan.has_runtime_work
     )
 
-    return files
+    return files, codegen_notes
 
 
 def emit_firmware_tree(
@@ -117,9 +116,9 @@ def emit_firmware_tree(
     manifests: dict[str, ComponentManifest],
     plan: SchedulingPlan,
     operations: OperationsSequence | None = None,
-) -> list[str]:
-    """Write generated files to disk; return list of relative paths written."""
-    files = generate_source_files(project, manifests, plan, operations=operations)
+) -> tuple[list[str], RuntimeCodegenNotes]:
+    """Write generated files to disk; return paths written and runtime codegen notes."""
+    files, codegen_notes = generate_source_files(project, manifests, plan, operations=operations)
     written: list[str] = []
 
     for rel_path, content in files.items():
@@ -128,4 +127,4 @@ def emit_firmware_tree(
         dest.write_text(content)
         written.append(rel_path)
 
-    return written
+    return written, codegen_notes

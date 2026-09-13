@@ -12,6 +12,16 @@ _FALLBACK_SDA_BCM = 2
 _FALLBACK_SCL_BCM = 3
 
 
+def c_string_literal(text: str) -> str:
+    """Escape text for use inside a C string literal."""
+    return (
+        text.replace("\\", "\\\\")
+        .replace('"', '\\"')
+        .replace("\n", "\\n")
+        .replace("\t", "\\t")
+    )
+
+
 def board_config_h(
     plan: SchedulingPlan,
     sda_pin_id: str | None = None,
@@ -183,58 +193,110 @@ def ops_interpreter_h() -> str:
 #ifndef OPS_INTERPRETER_H
 #define OPS_INTERPRETER_H
 
-void ops_runtime_run_startup_sequence(void);
 void ops_runtime_on_poll_tick(void);
 
 #endif
 """
 
 
-def ops_interpreter_c(plan: RuntimePlan) -> str:
-    startup_lines = ""
-    for step in plan.startup_delays:
-        safe = step.description.replace('"', "'")
-        startup_lines += (
-            f'    printf("[runtime] {step.step_id}: {safe} ({step.delay_ms} ms)\\n");\n'
-            f"    usleep({step.delay_ms * 1000});\n"
-        )
-    poll_lines = ""
-    for step in plan.periodic_steps:
-        safe = step.description.replace('"', "'")
-        poll_lines += f'    printf("[runtime] {step.step_id}: {safe}\\n");\n'
-
-    return f"""/* Operations sequence runtime interpreter (generated) */
-#include <stdio.h>
-#include <unistd.h>
-
+def ops_interpreter_c(plan: RuntimePlan, sensors: list[dict]) -> str:
+    if not plan.periodic_steps:
+        return """/* Operations sequence runtime interpreter (generated) */
 #include "ops_interpreter.h"
 
-void ops_runtime_run_startup_sequence(void) {{
-{startup_lines or "    /* no startup runtime delays */"}
+void ops_runtime_on_poll_tick(void) {
+}
+"""
+
+    hal_includes = "\n".join(
+        f'#include "../hal/{s["hal_module"]}.h"' for s in sensors
+    )
+    state_rows = "\n".join(
+        f'    {{"{step.step_id}", {step.period_ms}, 0}},' for step in plan.periodic_steps
+    )
+    step_funcs = []
+    switch_cases = []
+    for index, step in enumerate(plan.periodic_steps):
+        step_funcs.append(f"static void ops_run_{index}(void) {{\n{step.c_body}\n}}\n")
+        switch_cases.append(f"            case {index}: ops_run_{index}(); break;")
+
+    return f"""/* Operations sequence runtime interpreter (generated) */
+#include <stdint.h>
+#include <stdio.h>
+#include <time.h>
+
+#include "ops_interpreter.h"
+{hal_includes}
+
+static uint64_t now_ms(void) {{
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return (uint64_t)ts.tv_sec * 1000ULL + (uint64_t)ts.tv_nsec / 1000000ULL;
 }}
 
+typedef struct {{
+    const char *step_id;
+    unsigned period_ms;
+    uint64_t next_due_ms;
+}} ops_periodic_t;
+
+static ops_periodic_t ops_periodic[] = {{
+{state_rows}
+}};
+
+{"".join(step_funcs)}
 void ops_runtime_on_poll_tick(void) {{
-{poll_lines or "    /* no periodic runtime steps */"}
+    uint64_t now = now_ms();
+    for (size_t i = 0; i < sizeof(ops_periodic) / sizeof(ops_periodic[0]); i++) {{
+        if (now < ops_periodic[i].next_due_ms) {{
+            continue;
+        }}
+        switch (i) {{
+{chr(10).join(switch_cases)}
+        }}
+        ops_periodic[i].next_due_ms = now + ops_periodic[i].period_ms;
+    }}
 }}
 """
 
 
 def task_operations_runtime_c(plan: RuntimePlan) -> str:
-    return f"""/* Auto-generated runtime operations task (non-boot delays) */
+    tick = plan.tick_period_ms
+    return f"""/* Auto-generated runtime operations task (timerfd + pthread) */
 #include <pthread.h>
+#include <stdint.h>
 #include <stdio.h>
+#include <sys/timerfd.h>
+#include <time.h>
+#include <unistd.h>
 
+#include "../platform/board_config.h"
 #include "../runtime/ops_interpreter.h"
+
+#define OPS_RUNTIME_TICK_MS {tick}
 
 void *task_operations_runtime(void *arg) {{
     (void)arg;
-    ops_runtime_run_startup_sequence();
+    int tfd = timerfd_create(CLOCK_MONOTONIC, 0);
+    struct itimerspec spec = {{
+        .it_interval = {{OPS_RUNTIME_TICK_MS / 1000, (OPS_RUNTIME_TICK_MS % 1000) * 1000000L}},
+        .it_value = {{OPS_RUNTIME_TICK_MS / 1000, (OPS_RUNTIME_TICK_MS % 1000) * 1000000L}},
+    }};
+    timerfd_settime(tfd, 0, &spec, NULL);
+
+    uint64_t expirations;
+    for (;;) {{
+        if (read(tfd, &expirations, sizeof(expirations)) < 0) {{
+            continue;
+        }}
+        ops_runtime_on_poll_tick();
+    }}
     return NULL;
 }}
 """
 
 
-def task_sensor_poll_c(sensors: list[dict], *, include_runtime_tick: bool = False) -> str:
+def task_sensor_poll_c(sensors: list[dict]) -> str:
     inits = "\n    ".join(f"{s['hal_module']}_init();" for s in sensors)
     reads = "\n        ".join(
         f'float {s["node_id"]}_ma = 0.0f;\n        '
@@ -252,7 +314,6 @@ def task_sensor_poll_c(sensors: list[dict], *, include_runtime_tick: bool = Fals
 #include "../platform/board_config.h"
 #include "../hal/hal_i2c_bus_0.h"
 {chr(10).join(f'#include "../hal/{s["hal_module"]}.h"' for s in sensors)}
-{"#include \"../runtime/ops_interpreter.h\"" if include_runtime_tick else ""}
 
 void *task_sensor_poll(void *arg) {{
     (void)arg;
@@ -271,7 +332,6 @@ void *task_sensor_poll(void *arg) {{
             continue; /* interrupted or spurious wakeup — try again next period */
         }}
         {reads}
-{"        ops_runtime_on_poll_tick();" if include_runtime_tick else ""}
     }}
     return NULL;
 }}
@@ -299,7 +359,7 @@ def main_c(
     plan: SchedulingPlan,
     sensors: list[dict],
     boot_delays: list[tuple[int, str]] | None = None,
-    spawn_operations_runtime: list | None = None,
+    spawn_operations_runtime: bool = False,
 ) -> str:
     has_sensor_poll = any(t.task_id == "task_sensor_poll" for t in plan.tasks)
     has_background = any(t.task_id == "task_background" for t in plan.tasks)
@@ -316,7 +376,7 @@ def main_c(
     background_spawn = (
         '    spawn_thread(task_background, "task_background");' if has_background else ""
     )
-    has_ops_runtime = bool(spawn_operations_runtime)
+    has_ops_runtime = spawn_operations_runtime
     ops_runtime_extern = (
         "    extern void *task_operations_runtime(void *);" if has_ops_runtime else ""
     )
@@ -329,9 +389,9 @@ def main_c(
     boot_lines = ""
     if boot_delays:
         for ms, comment in boot_delays:
-            safe_comment = comment.replace('"', "'")
+            safe_comment = c_string_literal(comment)
             boot_lines += (
-                f'    printf("[boot] {safe_comment} ({ms} ms)\\n");\n'
+                f'    printf("[boot] %s (%d ms)\\n", "{safe_comment}", {ms});\n'
                 f"    usleep({ms * 1000});\n"
             )
 
@@ -399,7 +459,7 @@ runtime/ops_interpreter.o: runtime/ops_interpreter.c runtime/ops_interpreter.h
 tasks/task_operations_runtime.o: tasks/task_operations_runtime.c runtime/ops_interpreter.h"""
     return f"""# Auto-generated Makefile for {project_id} on Raspberry Pi 4
 CC = gcc
-CFLAGS = -Wall -Wextra -O2 -pthread -I.
+CFLAGS = -Wall -Wextra -Werror -O2 -pthread -I.
 LDFLAGS = -pthread
 
 OBJS = main.o hal/hal_i2c_bus_0.o tasks/task_sensor_poll.o tasks/task_background.o{runtime_objs} {hal_objs}

@@ -214,7 +214,7 @@ class TestBoardConfigReflectsActualWiring:
         )
         classify_nodes(project, manifests)  # sanity: classification doesn't blow up
         plan = plan_from_project(project, manifests)
-        files = generate_source_files(project, manifests, plan)
+        files, _notes = generate_source_files(project, manifests, plan)
 
         board_config = files["platform/board_config.h"]
         assert "PIN_I2C_SDA_BCM 12" in board_config

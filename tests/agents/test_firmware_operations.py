@@ -94,6 +94,41 @@ class TestFirmwareWithOperations:
         assert "usleep(1000000)" not in main_c, (
             "estop-release runtime delay must not be baked into the one-time boot sequence"
         )
+        assert "one-shot delays" in result.message.lower()
+        runtime_path = tmp_path / "valid_i2c_wiring" / "runtime" / "ops_interpreter.c"
+        if runtime_path.is_file():
+            runtime_c = runtime_path.read_text()
+            assert "usleep(500000)" not in runtime_c
+            assert "usleep(1000000)" not in runtime_c
+
+    def test_runtime_period_and_hal_emit(self, tmp_path: Path):
+        ops = OperationsSequence(
+            project_id="valid_i2c_wiring",
+            fidelity=FidelityLevel.TIMED,
+            steps=[
+                OperationStep(
+                    step_id="run2",
+                    description="Log bus current every second",
+                    hal_call="hal_sensor_read()",
+                    target_node_id="sensor_1",
+                    timing=TimingConstraint(period_ms=1000),
+                ),
+            ],
+        )
+        result = generate_firmware(
+            _valid_project_state(),
+            mock_manifests(),
+            approved=True,
+            operations=ops,
+            operations_approved=True,
+            output_root=tmp_path,
+        )
         runtime_c = (tmp_path / "valid_i2c_wiring" / "runtime" / "ops_interpreter.c").read_text()
-        assert "usleep(500000)" in runtime_c
-        assert "usleep(1000000)" in runtime_c
+        main_c = (tmp_path / "valid_i2c_wiring" / "main.c").read_text()
+        assert "1000" in runtime_c
+        assert "CLOCK_MONOTONIC" in runtime_c
+        assert "hal_sensor_1_read_current_ma" in runtime_c
+        assert "task_operations_runtime" in main_c
+        assert "ops_runtime_" not in (
+            tmp_path / "valid_i2c_wiring" / "tasks" / "task_sensor_poll.c"
+        ).read_text()

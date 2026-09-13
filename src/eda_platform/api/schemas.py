@@ -189,12 +189,16 @@ class SaveProjectMetadataRequest(BaseModel):
 
 class PipelineRunRequest(BaseModel):
     project_state: ProjectState
-    schematic_approved: bool = Field(
-        ..., description="Must be true to generate firmware"
-    )
     operations: OperationsSequence | None = None
-    operations_approved: bool = False
     manifests: dict[str, ComponentManifest] | None = None
+    refine: bool = False
+    persist_refine: bool = False
+    allow_unapproved: bool = Field(
+        default=False,
+        description="When true, use schematic_approved/operations_approved from this body instead of metadata.json",
+    )
+    schematic_approved: bool = False
+    operations_approved: bool = False
 
 
 class PipelineStageResult(BaseModel):

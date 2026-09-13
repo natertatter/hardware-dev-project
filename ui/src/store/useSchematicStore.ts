@@ -61,6 +61,7 @@ interface SchematicState {
   firmwareMessage: string | null;
   operatingProcedureMd: string | null;
   bringupChecklistMd: string | null;
+  operatingDocsMessage: string | null;
   autoWireStatus: AutoWireStatus;
   autoWireMessage: string | null;
   projectId: string;
@@ -95,6 +96,9 @@ function resetApprovalAndFirmware() {
     firmwareStatus: "idle" as FirmwareStatus,
     firmwareOutputDir: null,
     firmwareMessage: null,
+    operatingProcedureMd: null,
+    bringupChecklistMd: null,
+    operatingDocsMessage: null,
   };
 }
 
@@ -171,6 +175,7 @@ export const useSchematicStore = create<SchematicState>((set, get) => ({
   firmwareMessage: null,
   operatingProcedureMd: null,
   bringupChecklistMd: null,
+  operatingDocsMessage: null,
   autoWireStatus: "idle",
   autoWireMessage: null,
   projectId: DEFAULT_PROJECT_ID,
@@ -414,6 +419,7 @@ export const useSchematicStore = create<SchematicState>((set, get) => ({
         firmwareMessage: null,
         operatingProcedureMd: null,
         bringupChecklistMd: null,
+        operatingDocsMessage: null,
       });
       try {
         const projectState = compileProjectState(get().nodes, get().edges, get().projectId);
@@ -425,13 +431,17 @@ export const useSchematicStore = create<SchematicState>((set, get) => ({
         );
         let operatingProcedureMd: string | null = null;
         let bringupChecklistMd: string | null = null;
+        let operatingDocsMessage: string | null = null;
         if (activeOps) {
           try {
             const docs = await generateOperatingDocs(activeOps, projectState);
             operatingProcedureMd = docs.operating_procedure;
             bringupChecklistMd = docs.bringup_checklist;
-          } catch {
-            /* docs are supplementary to firmware output */
+          } catch (err) {
+            operatingDocsMessage =
+              err instanceof Error
+                ? `Operating docs unavailable: ${err.message}`
+                : "Operating docs unavailable.";
           }
         }
         set({
@@ -440,6 +450,7 @@ export const useSchematicStore = create<SchematicState>((set, get) => ({
           firmwareMessage: result.message,
           operatingProcedureMd,
           bringupChecklistMd,
+          operatingDocsMessage,
         });
       } catch (err) {
         set({
@@ -501,6 +512,9 @@ export const useSchematicStore = create<SchematicState>((set, get) => ({
           firmwareStatus: "idle",
           firmwareOutputDir: null,
           firmwareMessage: null,
+          operatingProcedureMd: null,
+          bringupChecklistMd: null,
+          operatingDocsMessage: null,
           autoWireStatus: "idle",
           autoWireMessage: null,
         });
