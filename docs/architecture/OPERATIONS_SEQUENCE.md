@@ -54,7 +54,7 @@ Vibe/draft input
     → Operations Checker (cross-check vs ProjectState, manifests, scheduling plan)
     → Refined output (for human review)
     → Merge into master.json (on approval)
-    → Firmware Engineer (boot/init delays + operating docs today; runtime executable ops — see [`ROADMAP.md`](../ROADMAP.md) Horizon B)
+    → Firmware Engineer (boot/init delays + operating docs; runtime ops interpreter in review — see ROADMAP.md Horizon B)
 ```
 
 ### Operations Refiner (`src/eda_platform/agents/operations_refiner/`)
@@ -98,6 +98,7 @@ Mirrors Logic Checker pattern: individual rules + `validate_operations_collect()
 | POST | `/api/v1/operations/merge` | Promote refined → master (with version bump) |
 | POST | `/api/v1/operations/generate-docs` | Markdown operating procedure + bring-up checklist |
 | POST | `/api/v1/projects/{id}/operations/approve` | Persist operations approval in project metadata |
+| POST | `/api/v1/pipeline/run` | Staged schematic validate → ops gates → firmware generate |
 
 Full request/response detail: [`API.md`](API.md).
 
@@ -135,8 +136,11 @@ The original phased plan (foundation → UI → librarian timing → firmware/do
 | Manifest timing + `OperationalConstraints` | Shipped |
 | Boot delays in generated `main.c` + operating markdown | Shipped |
 | Optional LLM narrative refine (Anthropic BYOK) | Shipped |
+| Runtime ops interpreter (`runtime/ops_interpreter`, poll hook) | In review (Horizon B1) |
+| Codegen fidelity gates for `executable` | In review (Horizon B2) |
+| Staged `POST /pipeline/run` orchestration | In review (Horizon B4) |
 
-**Not yet shipped:** embedding **runtime** executable operations in generated firmware (only boot/init one-shot delays). Planned under [`ROADMAP.md`](../ROADMAP.md) Horizon B.
+**Horizon B caveat:** the first implementation emits a runtime interpreter but does not yet honor `period_ms`, `hal_call`, `depends_on`, or `condition`, and `/pipeline/run` has no refine stage. Blocking defects and remediation steps are in [`../reviews/HORIZON_B_SENIOR_REVIEW.md`](../reviews/HORIZON_B_SENIOR_REVIEW.md).
 
 ## Cursor Workflow (end-to-end)
 

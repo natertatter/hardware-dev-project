@@ -152,6 +152,30 @@ body {
   white-space: nowrap;
 }
 
+.panel-card__docs {
+  margin-top: 0.75rem;
+  font-size: 0.75rem;
+}
+
+.panel-card__docs summary {
+  cursor: pointer;
+  color: var(--text-muted);
+  margin-bottom: 0.35rem;
+}
+
+.panel-card__doc-pre {
+  margin: 0;
+  padding: 0.5rem;
+  max-height: 12rem;
+  overflow: auto;
+  font-size: 0.6875rem;
+  line-height: 1.4;
+  background: var(--lab-bg);
+  border: 1px solid var(--lab-border);
+  border-radius: var(--radius-sm);
+  white-space: pre-wrap;
+}
+
 .editor-shell__btn--compact {
   padding: 0.35rem 0.65rem;
   font-size: 0.75rem;
