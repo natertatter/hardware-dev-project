@@ -66,6 +66,14 @@ Open the UI at **http://localhost:3000** (not only `127.0.0.1` unless you set `N
 
 **Windows:** `start-eda-platform.bat` starts both and sets `NEXT_PUBLIC_API_URL` for you.
 
+If ports are stuck or you see **“.eda-api.log … used by another process”** / API never passes health check:
+
+```bat
+start-eda-platform.bat stop
+```
+
+Then double-click `start-eda-platform.bat` again. The launcher frees ports **8000**, **3000**, and **3001**, starts the API in a separate **“EDA API”** window (no shared log file lock), and pins the UI to port **3000**. Close the minimized **EDA API** window when you are done, or run `stop` again.
+
 If the parts library works but Auto-Wire fails, the catalog may have fallen back to **mock** data while the API is still down — fix the API first, then hard-refresh the browser.
 
 ---
