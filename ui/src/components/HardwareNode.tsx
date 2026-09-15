@@ -85,6 +85,8 @@ function HardwareNodeComponent({ id, data }: NodeProps<Node<HardwareNodeData>>) 
 
   const leftPins = visiblePins.filter((p) => pinSide(manifest, p) === "left");
   const rightPins = visiblePins.filter((p) => pinSide(manifest, p) === "right");
+  const pinRows = Math.max(leftPins.length, rightPins.length, 1);
+  const bodyMinHeight = Math.max(120, pinRows * 24 + 16);
 
   return (
     <div className="hardware-node">
@@ -115,7 +117,7 @@ function HardwareNodeComponent({ id, data }: NodeProps<Node<HardwareNodeData>>) 
         protocols={protocols}
       />
 
-      <div className="hardware-node__body">
+      <div className="hardware-node__body" style={{ minHeight: `${bodyMinHeight}px` }}>
         <div className="hardware-node__column hardware-node__column--left">
           {leftPins.map((pin, i) => (
             <PinRow
