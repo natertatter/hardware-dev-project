@@ -68,7 +68,13 @@ def test_rpi4_spi_auto_wire_adds_spi_nets():
                 selected_protocol="SPI",
             ),
         ],
-        nets=[],
+        nets=[
+            Net(
+                net_id="placeholder",
+                net_type=NetType.GND,
+                connections=[NetConnection(node_id="pi_1", pin_id="GND")],
+            )
+        ],
     )
     updated, wires_added = template_auto_wire(project, manifests)
     assert wires_added >= 6
