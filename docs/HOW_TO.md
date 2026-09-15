@@ -53,7 +53,7 @@ NEXT_PUBLIC_API_URL=http://localhost:8000 npm run dev
 | 1 | **Parts library** or **Datasheet upload** | Add modules to the catalog; PDF upload creates a template manifest (review in `hardware_library/manifests/`) |
 | 2 | Click a catalog entry | Places a node on the canvas (optional viewport placement; mock catalog if API is offline) |
 | 3 | **Protocol** on multi-bus parts | Switches active pins; invalid edges are removed |
-| 4 | Wire pins or **Auto-Wire** | Template connects I2C power/GND/SDA/SCL (and serial links between MCUs when applicable) |
+| 4 | Wire pins or **Auto-Wire** | Template connects I2C power/GND/SDA/SCL (needs **MCU + sensor/actuator** on canvas; API must be reachable — check the Auto-Wire panel message) |
 | 5 | **Validate Architecture** | Logic Checker results in the right panel |
 | 6 | **Approve** | Locks schematic for codegen; editing the canvas clears approval |
 

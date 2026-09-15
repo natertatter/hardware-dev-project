@@ -322,6 +322,25 @@ export const useSchematicStore = create<SchematicState>((set, get) => ({
         });
         return;
       }
+      const hasMcu = currentNodes.some((n) => n.data.manifest.type === "MCU");
+      const hasPeripheral = currentNodes.some((n) =>
+        ["SENSOR", "ACTUATOR", "MOTOR_DRIVER"].includes(n.data.manifest.type),
+      );
+      if (!hasMcu) {
+        set({
+          autoWireStatus: "error",
+          autoWireMessage: "Place an MCU on the canvas before auto-wiring.",
+        });
+        return;
+      }
+      if (!hasPeripheral) {
+        set({
+          autoWireStatus: "error",
+          autoWireMessage:
+            "Place at least one sensor or actuator (e.g. INA219) before auto-wiring.",
+        });
+        return;
+      }
       set({
         autoWireStatus: "wiring",
         autoWireMessage: null,
@@ -356,6 +375,7 @@ export const useSchematicStore = create<SchematicState>((set, get) => ({
           manifests,
           currentNodes,
         );
+        const wiresAdded = response.wires_added;
         set({
           nodes,
           edges,
@@ -363,8 +383,11 @@ export const useSchematicStore = create<SchematicState>((set, get) => ({
           validationStatus: "idle",
           validationIssues: [],
           validationMessage: null,
-          autoWireStatus: "success",
-          autoWireMessage: `Added ${response.wires_added} net(s).`,
+          autoWireStatus: wiresAdded > 0 ? "success" : "error",
+          autoWireMessage:
+            wiresAdded > 0
+              ? `Added ${wiresAdded} net(s).`
+              : "No new nets were added — check that each peripheral has a supported protocol (e.g. I2C) and the API is running.",
         });
       } catch (err) {
         set({
