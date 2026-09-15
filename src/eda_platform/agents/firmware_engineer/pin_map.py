@@ -11,6 +11,10 @@ LOGICAL_TO_BCM: dict[str, int] = {
     "GPIO13": 13,
     "I2C_SDA": 2,
     "I2C_SCL": 3,
+    "GPIO10_SPI_MOSI": 10,
+    "GPIO9_SPI_MISO": 9,
+    "GPIO11_SPI_SCK": 11,
+    "GPIO8_SPI_CE0": 8,
 }
 
 I2C_DEVICE_PATH = "/dev/i2c-1"

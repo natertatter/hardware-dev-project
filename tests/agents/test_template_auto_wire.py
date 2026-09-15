@@ -44,3 +44,44 @@ def test_spi_auto_wire_adds_spi_nets():
     assert "auto_sensor_1_spi_miso" in net_ids
     assert "auto_sensor_1_spi_sck" in net_ids
     assert "auto_sensor_1_spi_cs" in net_ids
+
+
+def test_rpi4_spi_auto_wire_adds_spi_nets():
+    from pathlib import Path
+
+    from eda_platform.schemas import ComponentManifest
+
+    root = Path(__file__).resolve().parents[2] / "hardware_library" / "manifests"
+    manifests = {
+        "mcu_rpi4": ComponentManifest.model_validate_json(
+            (root / "mcu_rpi4.example.json").read_text()
+        ),
+        "sens_bme280": _load_bme280_manifest(),
+    }
+    project = ProjectState(
+        project_id="rpi4_spi",
+        nodes=[
+            Node(node_id="pi_1", component_id="mcu_rpi4"),
+            Node(
+                node_id="sensor_1",
+                component_id="sens_bme280",
+                selected_protocol="SPI",
+            ),
+        ],
+        nets=[
+            Net(
+                net_id="placeholder",
+                net_type=NetType.GND,
+                connections=[NetConnection(node_id="pi_1", pin_id="GND")],
+            )
+        ],
+    )
+    updated, wires_added = template_auto_wire(project, manifests)
+    assert wires_added >= 6
+    net_ids = {n.net_id for n in updated.nets}
+    assert "auto_sensor_1_spi_mosi" in net_ids
+    assert "auto_sensor_1_spi_miso" in net_ids
+    assert "auto_sensor_1_spi_sck" in net_ids
+    assert "auto_sensor_1_spi_cs" in net_ids
+    mosi = next(n for n in updated.nets if n.net_id == "auto_sensor_1_spi_mosi")
+    assert {c.pin_id for c in mosi.connections} == {"GPIO10_SPI_MOSI", "SDI"}

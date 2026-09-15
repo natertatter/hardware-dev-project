@@ -94,10 +94,11 @@ Then run `start-eda-platform.bat stop` and start again. The launcher now reinsta
 |------|--------|----------------|
 | 1 | **Parts library** or **Datasheet upload** | Add modules to the catalog; PDF upload creates a template manifest (review in `hardware_library/manifests/`) |
 | 2 | Click a catalog entry | Places a node on the canvas (optional viewport placement; mock catalog if API is offline) |
-| 3 | **Protocol** on multi-bus parts | Switches active pins; invalid edges are removed |
-| 4 | Wire pins or **Auto-Wire** | Template connects I2C power/GND/SDA/SCL (needs **MCU + sensor/actuator** on canvas; API must be reachable — check the Auto-Wire panel message) |
-| 5 | **Validate Architecture** | Logic Checker results in the right panel |
-| 6 | **Approve** | Locks schematic for codegen; editing the canvas clears approval |
+| 3 | **Remove** on a board (or Delete) | Takes that module and its wires off the canvas. Use this to clear extra boards loaded with a project. |
+| 4 | **Protocol** on multi-bus parts | Switches active pins; invalid edges are removed |
+| 5 | Wire pins or **Auto-Wire** | Template connects power, GND, and bus pins for the peripheral protocol (I2C: SDA/SCL; SPI: MOSI/MISO/SCK/CS). Needs **MCU + sensor/actuator**; API must be reachable. |
+| 6 | **Validate Architecture** | Logic Checker results in the right panel |
+| 7 | **Approve** | Locks schematic for codegen; editing the canvas clears approval |
 
 ### Operations (right panel)
 

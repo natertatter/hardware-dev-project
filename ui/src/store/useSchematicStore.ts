@@ -74,6 +74,7 @@ interface SchematicState {
     onEdgesChange: (changes: EdgeChange[]) => void;
     onConnect: (connection: Connection) => void;
     addNodeFromCatalog: (entry: CatalogEntry, position?: { x: number; y: number }) => void;
+    removeNode: (nodeId: string) => void;
     setNodeProtocol: (nodeId: string, protocol: string) => void;
     loadCatalog: () => Promise<void>;
     validateArchitecture: () => Promise<void>;
@@ -185,8 +186,19 @@ export const useSchematicStore = create<SchematicState>((set, get) => ({
   lastSavedDraftHash: null,
   actions: {
     onNodesChange: (changes) => {
+      const removedIds = new Set(
+        changes.filter((change) => change.type === "remove").map((change) => change.id),
+      );
+      const nextNodes = applyNodeChanges(changes, get().nodes);
+      const nextEdges =
+        removedIds.size === 0
+          ? get().edges
+          : get().edges.filter(
+              (edge) => !removedIds.has(edge.source) && !removedIds.has(edge.target),
+            );
       set({
-        nodes: applyNodeChanges(changes, get().nodes),
+        nodes: nextNodes,
+        edges: nextEdges,
         ...(isUserDrivenNodeChange(changes) ? resetWorkflowState() : {}),
       });
     },
@@ -227,6 +239,17 @@ export const useSchematicStore = create<SchematicState>((set, get) => ({
       };
       set({
         nodes: [...get().nodes, newNode],
+        ...resetWorkflowState(),
+      });
+    },
+    removeNode: (nodeId) => {
+      const { nodes, edges } = get();
+      if (!nodes.some((node) => node.id === nodeId)) {
+        return;
+      }
+      set({
+        nodes: nodes.filter((node) => node.id !== nodeId),
+        edges: edges.filter((edge) => edge.source !== nodeId && edge.target !== nodeId),
         ...resetWorkflowState(),
       });
     },
@@ -376,6 +399,24 @@ export const useSchematicStore = create<SchematicState>((set, get) => ({
           currentNodes,
         );
         const wiresAdded = response.wires_added;
+        const spiRequested = currentNodes.some(
+          (node) =>
+            node.data.selected_protocol === "SPI" ||
+            (node.data.selected_protocol == null &&
+              defaultProtocol(node.data.manifest) === "SPI"),
+        );
+        const spiNets = response.project_state.nets.filter((net) =>
+          /spi_(mosi|miso|sck|cs)/i.test(net.net_id),
+        );
+        let message: string;
+        if (wiresAdded <= 0) {
+          message =
+            "No new nets were added — check that each peripheral has a supported protocol (e.g. I2C or SPI) and the API is running.";
+        } else if (spiRequested && spiNets.length === 0) {
+          message = `Added ${wiresAdded} net(s), but SPI data pins were not matched. Confirm the MCU has SPI_MOSI / SPI_MISO / SPI_SCK (and CS) pins.`;
+        } else {
+          message = `Added ${wiresAdded} net(s).`;
+        }
         set({
           nodes,
           edges,
@@ -384,10 +425,7 @@ export const useSchematicStore = create<SchematicState>((set, get) => ({
           validationIssues: [],
           validationMessage: null,
           autoWireStatus: wiresAdded > 0 ? "success" : "error",
-          autoWireMessage:
-            wiresAdded > 0
-              ? `Added ${wiresAdded} net(s).`
-              : "No new nets were added — check that each peripheral has a supported protocol (e.g. I2C) and the API is running.",
+          autoWireMessage: message,
         });
       } catch (err) {
         set({

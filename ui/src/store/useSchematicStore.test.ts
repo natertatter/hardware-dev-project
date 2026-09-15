@@ -81,4 +81,37 @@ describe("useSchematicStore", () => {
 
     globalThis.fetch = originalFetch;
   });
+
+  it("removes a board and its connected wires", () => {
+    const mcu = COMPONENT_CATALOG[0];
+    const sensor = COMPONENT_CATALOG[1];
+    useSchematicStore.getState().actions.addNodeFromCatalog({
+      label: mcu.name,
+      manifest: mcu,
+    });
+    useSchematicStore.getState().actions.addNodeFromCatalog({
+      label: sensor.name,
+      manifest: sensor,
+    });
+    const [mcuNode, sensorNode] = useSchematicStore.getState().nodes;
+    useSchematicStore.setState({
+      edges: [
+        {
+          id: "edge-gnd",
+          source: mcuNode.id,
+          sourceHandle: "GND",
+          target: sensorNode.id,
+          targetHandle: "GND",
+        },
+      ],
+      schematicApproved: true,
+    });
+
+    useSchematicStore.getState().actions.removeNode(sensorNode.id);
+
+    const state = useSchematicStore.getState();
+    expect(state.nodes.map((n) => n.id)).toEqual([mcuNode.id]);
+    expect(state.edges).toEqual([]);
+    expect(state.schematicApproved).toBe(false);
+  });
 });
