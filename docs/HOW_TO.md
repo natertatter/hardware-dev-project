@@ -42,6 +42,32 @@ NEXT_PUBLIC_API_URL=http://localhost:8000 npm run dev
 
 **Note:** Docker Compose mounts `hardware_library` (read-only), `projects/`, and `generated/` into the API container so saves and firmware output survive restarts.
 
+### Local dev: “Failed to fetch” / Auto-Wire cannot reach API
+
+The UI calls `NEXT_PUBLIC_API_URL` (default `http://localhost:8000`). **You must run the API and the UI as two processes.** Starting only `npm run dev` in `ui/` leaves nothing on port 8000, so Auto-Wire, Validate, and Save show **failed to fetch**.
+
+**Terminal 1 (API)** — repo root:
+
+```bash
+pip install -e ".[dev]"
+uvicorn eda_platform.api.main:app --reload --port 8000
+```
+
+Check: `curl http://localhost:8000/health` → `{"status":"ok"}`
+
+**Terminal 2 (UI)**:
+
+```bash
+cd ui && npm install
+NEXT_PUBLIC_API_URL=http://localhost:8000 npm run dev
+```
+
+Open the UI at **http://localhost:3000** (not only `127.0.0.1` unless you set `NEXT_PUBLIC_API_URL=http://127.0.0.1:8000` and add that origin to `CORS_ORIGINS`).
+
+**Windows:** `start-eda-platform.bat` starts both and sets `NEXT_PUBLIC_API_URL` for you.
+
+If the parts library works but Auto-Wire fails, the catalog may have fallen back to **mock** data while the API is still down — fix the API first, then hard-refresh the browser.
+
 ---
 
 ## UI workflow
@@ -53,7 +79,7 @@ NEXT_PUBLIC_API_URL=http://localhost:8000 npm run dev
 | 1 | **Parts library** or **Datasheet upload** | Add modules to the catalog; PDF upload creates a template manifest (review in `hardware_library/manifests/`) |
 | 2 | Click a catalog entry | Places a node on the canvas (optional viewport placement; mock catalog if API is offline) |
 | 3 | **Protocol** on multi-bus parts | Switches active pins; invalid edges are removed |
-| 4 | Wire pins or **Auto-Wire** | Template connects I2C power/GND/SDA/SCL (and serial links between MCUs when applicable) |
+| 4 | Wire pins or **Auto-Wire** | Template connects I2C power/GND/SDA/SCL (needs **MCU + sensor/actuator** on canvas; API must be reachable — check the Auto-Wire panel message) |
 | 5 | **Validate Architecture** | Logic Checker results in the right panel |
 | 6 | **Approve** | Locks schematic for codegen; editing the canvas clears approval |
 
