@@ -34,7 +34,7 @@ where node >nul 2>&1 || (
 REM ── First-run / stale install (eda_platform without python-multipart breaks API) ─
 %PYTHON% -c "import eda_platform, multipart" >nul 2>&1
 if errorlevel 1 (
-  echo [SETUP] Installing Python dependencies (editable install + dev extras)...
+  echo [SETUP] Installing Python dependencies - editable install with dev extras...
   %PYTHON% -m pip install -e ".[dev]" || (echo [ERROR] pip install failed. & pause & exit /b 1)
 )
 if not exist "ui\node_modules\" (
@@ -48,7 +48,7 @@ call :free_ports
 
 REM ── Start API (separate minimized window — avoids .eda-api.log file locks) ─
 set "CORS_ORIGINS=http://localhost:3000,http://127.0.0.1:3000,http://localhost:3001,http://127.0.0.1:3001"
-echo [API]  http://localhost:8000  (logs in the minimized "EDA API" window)
+echo [API]  http://localhost:8000  - logs in the minimized EDA API window
 start "EDA API" /min cmd /c "cd /d "%~dp0" && set CORS_ORIGINS=%CORS_ORIGINS% && %PYTHON% -m uvicorn eda_platform.api.main:app --reload --port 8000"
 
 echo [API]  Waiting for health check...
