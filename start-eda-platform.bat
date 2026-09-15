@@ -31,10 +31,10 @@ where node >nul 2>&1 || (
   exit /b 1
 )
 
-REM ── First-run setup ────────────────────────────────────────────────────
-%PYTHON% -c "import eda_platform" >nul 2>&1
+REM ── First-run / stale install (eda_platform without python-multipart breaks API) ─
+%PYTHON% -c "import eda_platform, multipart" >nul 2>&1
 if errorlevel 1 (
-  echo [SETUP] Installing Python dependencies...
+  echo [SETUP] Installing Python dependencies (editable install + dev extras)...
   %PYTHON% -m pip install -e ".[dev]" || (echo [ERROR] pip install failed. & pause & exit /b 1)
 )
 if not exist "ui\node_modules\" (

@@ -76,6 +76,14 @@ Then double-click `start-eda-platform.bat` again. The launcher frees ports **800
 
 If the parts library works but Auto-Wire fails, the catalog may have fallen back to **mock** data while the API is still down — fix the API first, then hard-refresh the browser.
 
+If the **EDA API** window shows `Form data requires "python-multipart" to be installed`, your Python environment is missing a declared dependency (common after upgrading the repo without reinstalling). From the repo root:
+
+```bat
+python -m pip install -e ".[dev]"
+```
+
+Then run `start-eda-platform.bat stop` and start again. The launcher now reinstalls when `multipart` is missing even if `eda_platform` already imports.
+
 ---
 
 ## UI workflow
