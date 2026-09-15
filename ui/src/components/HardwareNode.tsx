@@ -4,7 +4,7 @@ import { memo, useMemo } from "react";
 import { Handle, Position, type Node, type NodeProps } from "@xyflow/react";
 
 import { ProtocolSelector } from "@/components/ProtocolSelector";
-import type { HardwareNodeData, Pin, PinType } from "@/types/schemas";
+import type { ComponentManifest, HardwareNodeData, Pin, PinType } from "@/types/schemas";
 import {
   availableProtocols,
   defaultProtocol,
@@ -40,7 +40,34 @@ function isLeftSidePin(pin: Pin): boolean {
   return true;
 }
 
-const HANDLE_TYPE = "source" as const;
+/** MCU outputs on the right (source handles); peripherals accept on the left (target). */
+export function pinSide(manifest: ComponentManifest, pin: Pin): "left" | "right" {
+  const pt = pin.pin_type;
+  if (manifest.type === "MCU") {
+    if (pt === "POWER" && (pin.max_current_source_ma ?? 0) > 0) return "right";
+    if (pt === "GND") return "right";
+    if (
+      pt === "I2C_SDA" ||
+      pt === "I2C_SCL" ||
+      pt === "SPI_MOSI" ||
+      pt === "SPI_SCK" ||
+      pt === "SPI_CS" ||
+      pt === "UART_TX" ||
+      pt === "GPIO_OUT"
+    ) {
+      return "right";
+    }
+    return "left";
+  }
+  if (pt === "POWER" || pt === "GND") return "left";
+  if (pt === "I2C_SDA" || pt === "I2C_SCL" || pt === "SPI_MISO" || pt === "UART_RX") {
+    return "left";
+  }
+  if (pt === "SPI_MOSI" || pt === "SPI_SCK" || pt === "UART_TX" || pt === "GPIO_OUT") {
+    return "right";
+  }
+  return isLeftSidePin(pin) ? "left" : "right";
+}
 
 function PinRow({
   pin,
@@ -54,6 +81,7 @@ function PinRow({
   total: number;
 }) {
   const topPct = ((index + 1) / (total + 1)) * 100;
+  const handleType = side === "left" ? "target" : "source";
 
   return (
     <div
@@ -62,7 +90,7 @@ function PinRow({
     >
       {side === "left" && (
         <Handle
-          type={HANDLE_TYPE}
+          type={handleType}
           position={Position.Left}
           id={pin.pin_id}
           className="hardware-node__handle"
@@ -74,7 +102,7 @@ function PinRow({
       </span>
       {side === "right" && (
         <Handle
-          type={HANDLE_TYPE}
+          type={handleType}
           position={Position.Right}
           id={pin.pin_id}
           className="hardware-node__handle"
@@ -94,8 +122,8 @@ function HardwareNodeComponent({ id, data }: NodeProps<Node<HardwareNodeData>>) 
     [manifest, activeProtocol],
   );
 
-  const leftPins = visiblePins.filter(isLeftSidePin);
-  const rightPins = visiblePins.filter((p) => !isLeftSidePin(p));
+  const leftPins = visiblePins.filter((p) => pinSide(manifest, p) === "left");
+  const rightPins = visiblePins.filter((p) => pinSide(manifest, p) === "right");
 
   return (
     <div className="hardware-node">
