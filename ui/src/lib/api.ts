@@ -42,13 +42,26 @@ export interface UploadManifestResponse {
 }
 
 async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, {
-    ...init,
-    headers: {
-      "Content-Type": "application/json",
-      ...(init?.headers ?? {}),
-    },
-  });
+  const url = `${API_BASE}${path}`;
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      ...init,
+      headers: {
+        "Content-Type": "application/json",
+        ...(init?.headers ?? {}),
+      },
+    });
+  } catch {
+    throw new Error(
+      `Cannot reach the API at ${API_BASE} (failed to fetch). ` +
+        "Start the API in a separate terminal: " +
+        "uvicorn eda_platform.api.main:app --reload --port 8000 " +
+        "(from the repo root after pip install -e \".[dev]\"). " +
+        "Then restart the UI with NEXT_PUBLIC_API_URL matching how you open the app " +
+        "(e.g. http://localhost:8000 if you use http://localhost:3000).",
+    );
+  }
 
   if (!res.ok) {
     const detail = await res.text();
