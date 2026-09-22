@@ -10,6 +10,7 @@
   },
   "default_protocol": "UART",
   "protocol_profiles": {
+    "SPI": ["5V", "GND", "D51_MOSI", "D50_MISO", "D52_SCK", "D53_SS"],
     "UART": ["GND", "D0_RX", "D1_TX"],
     "USB_SERIAL": ["GND", "USB_DEVICE"]
   },
@@ -41,6 +42,34 @@
       "pin_id": "GND",
       "pin_type": "GND",
       "supported_features": [],
+      "internal_pullup_enabled": false,
+      "active_state": "NONE"
+    },
+    {
+      "pin_id": "D51_MOSI",
+      "pin_type": "SPI_MOSI",
+      "supported_features": ["SPI"],
+      "internal_pullup_enabled": false,
+      "active_state": "NONE"
+    },
+    {
+      "pin_id": "D50_MISO",
+      "pin_type": "SPI_MISO",
+      "supported_features": ["SPI"],
+      "internal_pullup_enabled": false,
+      "active_state": "NONE"
+    },
+    {
+      "pin_id": "D52_SCK",
+      "pin_type": "SPI_SCK",
+      "supported_features": ["SPI"],
+      "internal_pullup_enabled": false,
+      "active_state": "NONE"
+    },
+    {
+      "pin_id": "D53_SS",
+      "pin_type": "SPI_CS",
+      "supported_features": ["SPI"],
       "internal_pullup_enabled": false,
       "active_state": "NONE"
     },

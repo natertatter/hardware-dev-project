@@ -114,7 +114,9 @@ def _append_serial_mcu_nets(
     peer_gnd = _pin_by_type_optional(peer_manifest, PinType.GND)
     if host_gnd and peer_gnd:
         net_id = f"{prefix}_gnd"
-        if net_id not in existing_net_ids:
+        if net_id not in existing_net_ids and not _already_wired(
+            project.nets, new_nets, host.node_id, host_gnd.pin_id, peer.node_id, peer_gnd.pin_id
+        ):
             new_nets.append(
                 Net(
                     net_id=net_id,
@@ -133,7 +135,14 @@ def _append_serial_mcu_nets(
         peer_usb = _usb_serial_pin(peer_manifest)
         if host_usb and peer_usb:
             net_id = f"{prefix}_usb_serial"
-            if net_id not in existing_net_ids:
+            if net_id not in existing_net_ids and not _already_wired(
+                project.nets,
+                new_nets,
+                host.node_id,
+                host_usb.pin_id,
+                peer.node_id,
+                peer_usb.pin_id,
+            ):
                 new_nets.append(
                     Net(
                         net_id=net_id,
@@ -160,6 +169,10 @@ def _append_serial_mcu_nets(
             cross_specs.append((f"{prefix}_uart_rx_tx", host_rx.pin_id, peer_tx.pin_id))
         for net_id, host_pin_id, peer_pin_id in cross_specs:
             if net_id in existing_net_ids:
+                continue
+            if _already_wired(
+                project.nets, new_nets, host.node_id, host_pin_id, peer.node_id, peer_pin_id
+            ):
                 continue
             new_nets.append(
                 Net(
@@ -226,6 +239,74 @@ def _pwm_pin(manifest: ComponentManifest) -> Pin | None:
     return None
 
 
+def _connection_keys(net: Net) -> set[tuple[str, str]]:
+    return {(c.node_id, c.pin_id) for c in net.connections}
+
+
+def _already_wired(
+    existing_nets: list[Net],
+    new_nets: list[Net],
+    a_node: str,
+    a_pin: str,
+    b_node: str,
+    b_pin: str,
+) -> bool:
+    """True when both endpoints already share any net (any net_id)."""
+    wanted = {(a_node, a_pin), (b_node, b_pin)}
+    for net in (*existing_nets, *new_nets):
+        if wanted <= _connection_keys(net):
+            return True
+    return False
+
+
+def _mcu_cs_pins(manifest: ComponentManifest) -> list[Pin]:
+    return [p for p in manifest.pins if p.pin_type == PinType.SPI_CS]
+
+
+def _mcu_pin_claimed(
+    existing_nets: list[Net], new_nets: list[Net], mcu_id: str, pin_id: str
+) -> bool:
+    for net in (*existing_nets, *new_nets):
+        keys = _connection_keys(net)
+        if (mcu_id, pin_id) not in keys:
+            continue
+        if any(node_id != mcu_id or other_pin != pin_id for node_id, other_pin in keys):
+            return True
+    return False
+
+
+def _peripheral_already_wired_to_mcu(
+    existing_nets: list[Net],
+    new_nets: list[Net],
+    mcu_id: str,
+    peripheral_id: str,
+    peripheral_pin_id: str,
+) -> bool:
+    for net in (*existing_nets, *new_nets):
+        keys = _connection_keys(net)
+        if (peripheral_id, peripheral_pin_id) not in keys:
+            continue
+        if any(node_id == mcu_id for node_id, _ in keys):
+            return True
+    return False
+
+
+def _next_free_mcu_cs_pin(
+    mcu_manifest: ComponentManifest,
+    mcu_id: str,
+    existing_nets: list[Net],
+    new_nets: list[Net],
+    reserved_pin_ids: set[str] | None = None,
+) -> Pin | None:
+    reserved = reserved_pin_ids or set()
+    for pin in _mcu_cs_pins(mcu_manifest):
+        if pin.pin_id in reserved:
+            continue
+        if not _mcu_pin_claimed(existing_nets, new_nets, mcu_id, pin.pin_id):
+            return pin
+    return None
+
+
 def _bus_pin_pairs(
     mcu_manifest: ComponentManifest,
     peripheral_manifest: ComponentManifest,
@@ -245,6 +326,10 @@ def _bus_pin_pairs(
         if protocol == "SPI" and pt == PinType.SPI_CS:
             if _pin_by_type_optional(peripheral_manifest, pt) is None:
                 continue
+            if not _mcu_cs_pins(mcu_manifest):
+                continue
+            pairs.append((pt, pt.value.lower()))
+            continue
         if _pin_by_type_optional(mcu_manifest, pt) and _pin_by_type_optional(peripheral_manifest, pt):
             suffix = pt.value.lower()
             pairs.append((pt, suffix))
@@ -306,8 +391,26 @@ def template_auto_wire(
                         (f"{prefix}_{suffix}", NetType.SIGNAL, mcu_pin.pin_id, periph_pin.pin_id)
                     )
             else:
-                mcu_pin = _pin_by_type_optional(mcu_manifest, pin_type)
                 periph_pin = _pin_by_type_optional(peripheral_manifest, pin_type)
+                if protocol == "SPI" and pin_type == PinType.SPI_CS:
+                    if periph_pin and _peripheral_already_wired_to_mcu(
+                        project.nets,
+                        new_nets,
+                        mcu.node_id,
+                        peripheral.node_id,
+                        periph_pin.pin_id,
+                    ):
+                        continue
+                    queued_mcu_pins = {pin_id for _, _, pin_id, _ in net_specs}
+                    mcu_pin = _next_free_mcu_cs_pin(
+                        mcu_manifest,
+                        mcu.node_id,
+                        project.nets,
+                        new_nets,
+                        reserved_pin_ids=queued_mcu_pins,
+                    )
+                else:
+                    mcu_pin = _pin_by_type_optional(mcu_manifest, pin_type)
                 if mcu_pin and periph_pin:
                     net_type = NetType.BUS if protocol in ("I2C", "SPI", "UART") else NetType.SIGNAL
                     net_specs.append(
@@ -316,6 +419,15 @@ def template_auto_wire(
 
         for net_id, net_type, mcu_pin_id, peripheral_pin_id in net_specs:
             if net_id in existing_net_ids:
+                continue
+            if _already_wired(
+                project.nets,
+                new_nets,
+                mcu.node_id,
+                mcu_pin_id,
+                peripheral.node_id,
+                peripheral_pin_id,
+            ):
                 continue
             new_nets.append(
                 Net(
