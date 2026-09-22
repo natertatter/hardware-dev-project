@@ -11,7 +11,7 @@
   "default_protocol": "UART",
   "protocol_profiles": {
     "I2C": ["5V", "3V3", "GND", "GPIO2_I2C_SDA", "GPIO3_I2C_SCL"],
-    "SPI": ["3V3", "GND", "GPIO10_SPI_MOSI", "GPIO9_SPI_MISO", "GPIO11_SPI_SCK", "GPIO8_SPI_CE0"],
+    "SPI": ["3V3", "GND", "GPIO10_SPI_MOSI", "GPIO9_SPI_MISO", "GPIO11_SPI_SCK", "GPIO8_SPI_CE0", "GPIO7_SPI_CE1"],
     "UART": ["GND", "GPIO14_UART_TX", "GPIO15_UART_RX"],
     "USB_SERIAL": ["GND", "USB_HOST"]
   },
@@ -76,6 +76,13 @@
     },
     {
       "pin_id": "GPIO8_SPI_CE0",
+      "pin_type": "SPI_CS",
+      "supported_features": ["SPI"],
+      "internal_pullup_enabled": false,
+      "active_state": "NONE"
+    },
+    {
+      "pin_id": "GPIO7_SPI_CE1",
       "pin_type": "SPI_CS",
       "supported_features": ["SPI"],
       "internal_pullup_enabled": false,
