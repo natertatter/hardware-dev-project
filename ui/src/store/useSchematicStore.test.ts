@@ -114,4 +114,82 @@ describe("useSchematicStore", () => {
     expect(state.edges).toEqual([]);
     expect(state.schematicApproved).toBe(false);
   });
+
+  it("invalidates validation so Approve cannot run after a board is removed", () => {
+    const mcu = COMPONENT_CATALOG[0];
+    const sensor = COMPONENT_CATALOG[1];
+    useSchematicStore.getState().actions.addNodeFromCatalog({
+      label: mcu.name,
+      manifest: mcu,
+    });
+    useSchematicStore.getState().actions.addNodeFromCatalog({
+      label: sensor.name,
+      manifest: sensor,
+    });
+    const [mcuNode, sensorNode] = useSchematicStore.getState().nodes;
+    useSchematicStore.setState({
+      edges: [
+        {
+          id: "edge-gnd",
+          source: mcuNode.id,
+          sourceHandle: "GND",
+          target: sensorNode.id,
+          targetHandle: "GND",
+        },
+      ],
+      validationStatus: "pass",
+      validationIssues: [],
+      validationMessage: "Architecture passed all validation rules.",
+      schematicApproved: false,
+    });
+
+    useSchematicStore.getState().actions.removeNode(sensorNode.id);
+
+    const state = useSchematicStore.getState();
+    expect(state.validationStatus).toBe("idle");
+    expect(state.validationIssues).toEqual([]);
+    expect(state.validationMessage).toBeNull();
+  });
+
+  it("keyboard-deletes a board and drops wires attached to it", () => {
+    const mcu = COMPONENT_CATALOG[0];
+    const sensor = COMPONENT_CATALOG[1];
+    useSchematicStore.getState().actions.addNodeFromCatalog({
+      label: mcu.name,
+      manifest: mcu,
+    });
+    useSchematicStore.getState().actions.addNodeFromCatalog({
+      label: sensor.name,
+      manifest: sensor,
+    });
+    const [mcuNode, sensorNode] = useSchematicStore.getState().nodes;
+    useSchematicStore.setState({
+      edges: [
+        {
+          id: "edge-sda",
+          source: mcuNode.id,
+          sourceHandle: "GPIO4",
+          target: sensorNode.id,
+          targetHandle: "I2C_SDA",
+        },
+        {
+          id: "edge-unrelated-placeholder",
+          source: mcuNode.id,
+          sourceHandle: "GND",
+          target: mcuNode.id,
+          targetHandle: "GND",
+        },
+      ],
+      validationStatus: "pass",
+    });
+
+    useSchematicStore.getState().actions.onNodesChange([
+      { id: sensorNode.id, type: "remove" },
+    ]);
+
+    const state = useSchematicStore.getState();
+    expect(state.nodes.map((n) => n.id)).toEqual([mcuNode.id]);
+    expect(state.edges.map((e) => e.id)).toEqual(["edge-unrelated-placeholder"]);
+    expect(state.validationStatus).toBe("idle");
+  });
 });

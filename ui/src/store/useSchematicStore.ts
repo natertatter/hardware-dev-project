@@ -109,6 +109,9 @@ function resetWorkflowState() {
     ...resetApprovalAndFirmware(),
     autoWireStatus: "idle" as AutoWireStatus,
     autoWireMessage: null,
+    validationStatus: "idle" as ValidationStatus,
+    validationIssues: [],
+    validationMessage: null,
   };
 }
 
