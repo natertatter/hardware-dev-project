@@ -12,7 +12,16 @@
     "I2C_SDA": 2,
     "I2C_SCL": 3,
     "GPIO14_UART_TX": 14,
-    "GPIO15_UART_RX": 15
+    "GPIO15_UART_RX": 15,
+    "GPIO10_SPI_MOSI": 10,
+    "GPIO9_SPI_MISO": 9,
+    "GPIO11_SPI_SCK": 11,
+    "GPIO8_SPI_CE0": 8,
+    "GPIO7_SPI_CE1": 7,
+    "GPIO18": 10,
+    "GPIO19": 9,
+    "GPIO20": 11,
+    "GPIO17": 8
   },
-  "notes": "Enable I2C via raspi-config. UART0 on GPIO14/15 (header pins 8/10). USB host port for Arduino USB-serial cable."
+  "notes": "Enable I2C and SPI via raspi-config. UART0 on GPIO14/15 (header pins 8/10). SPI0 on GPIO10/9/11/8/7 (MOSI/MISO/SCLK/CE0/CE1). USB host port for Arduino USB-serial cable."
 }

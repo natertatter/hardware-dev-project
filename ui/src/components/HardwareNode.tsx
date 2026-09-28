@@ -4,70 +4,16 @@ import { memo, useMemo } from "react";
 import { Handle, Position, type Node, type NodeProps } from "@xyflow/react";
 
 import { ProtocolSelector } from "@/components/ProtocolSelector";
-import type { ComponentManifest, HardwareNodeData, Pin, PinType } from "@/types/schemas";
+import { useSchematicStore } from "@/store/useSchematicStore";
+import type { HardwareNodeData, Pin } from "@/types/schemas";
+import { pinSide } from "@/utils/pinSide";
 import {
   availableProtocols,
   defaultProtocol,
   pinsForProtocol,
 } from "@/utils/protocolProfiles";
 
-/**
- * Left side: input pins and power pins (POWER, GND, GPIO_IN, I2C/SPI/UART/ANALOG
- * inputs). Right side: output and signal pins (GPIO_OUT, SPI_MOSI/SCK/CS, UART_TX).
- */
-const LEFT_PIN_TYPES: ReadonlySet<PinType> = new Set([
-  "POWER",
-  "GND",
-  "GPIO_IN",
-  "I2C_SDA",
-  "I2C_SCL",
-  "SPI_MISO",
-  "UART_RX",
-  "ANALOG_IN",
-]);
-
-const RIGHT_PIN_TYPES: ReadonlySet<PinType> = new Set([
-  "GPIO_OUT",
-  "SPI_MOSI",
-  "SPI_SCK",
-  "SPI_CS",
-  "UART_TX",
-]);
-
-function isLeftSidePin(pin: Pin): boolean {
-  if (RIGHT_PIN_TYPES.has(pin.pin_type)) return false;
-  if (LEFT_PIN_TYPES.has(pin.pin_type)) return true;
-  return true;
-}
-
-/** MCU outputs on the right (source handles); peripherals accept on the left (target). */
-export function pinSide(manifest: ComponentManifest, pin: Pin): "left" | "right" {
-  const pt = pin.pin_type;
-  if (manifest.type === "MCU") {
-    if (pt === "POWER" && (pin.max_current_source_ma ?? 0) > 0) return "right";
-    if (pt === "GND") return "right";
-    if (
-      pt === "I2C_SDA" ||
-      pt === "I2C_SCL" ||
-      pt === "SPI_MOSI" ||
-      pt === "SPI_SCK" ||
-      pt === "SPI_CS" ||
-      pt === "UART_TX" ||
-      pt === "GPIO_OUT"
-    ) {
-      return "right";
-    }
-    return "left";
-  }
-  if (pt === "POWER" || pt === "GND") return "left";
-  if (pt === "I2C_SDA" || pt === "I2C_SCL" || pt === "SPI_MISO" || pt === "UART_RX") {
-    return "left";
-  }
-  if (pt === "SPI_MOSI" || pt === "SPI_SCK" || pt === "UART_TX" || pt === "GPIO_OUT") {
-    return "right";
-  }
-  return isLeftSidePin(pin) ? "left" : "right";
-}
+export { pinSide } from "@/utils/pinSide";
 
 function PinRow({
   pin,
@@ -114,21 +60,53 @@ function PinRow({
 
 function HardwareNodeComponent({ id, data }: NodeProps<Node<HardwareNodeData>>) {
   const { manifest, selected_protocol } = data;
+  const removeNode = useSchematicStore((s) => s.actions.removeNode);
+  const edges = useSchematicStore((s) => s.edges);
   const protocols = useMemo(() => availableProtocols(manifest), [manifest]);
   const activeProtocol =
     selected_protocol ?? defaultProtocol(manifest) ?? protocols[0] ?? null;
-  const visiblePins = useMemo(
-    () => pinsForProtocol(manifest, activeProtocol),
-    [manifest, activeProtocol],
-  );
+  const visiblePins = useMemo(() => {
+    const protoPins = pinsForProtocol(manifest, activeProtocol);
+    const connectedIds = new Set<string>();
+    for (const edge of edges) {
+      if (edge.source === id && edge.sourceHandle) connectedIds.add(edge.sourceHandle);
+      if (edge.target === id && edge.targetHandle) connectedIds.add(edge.targetHandle);
+    }
+    if (connectedIds.size === 0) {
+      return protoPins;
+    }
+    const byId = new Map(manifest.pins.map((p) => [p.pin_id, p]));
+    const seen = new Set(protoPins.map((p) => p.pin_id));
+    const extras = [...connectedIds]
+      .map((pinId) => byId.get(pinId))
+      .filter((pin): pin is Pin => pin != null && !seen.has(pin.pin_id));
+    return [...protoPins, ...extras];
+  }, [manifest, activeProtocol, edges, id]);
 
   const leftPins = visiblePins.filter((p) => pinSide(manifest, p) === "left");
   const rightPins = visiblePins.filter((p) => pinSide(manifest, p) === "right");
+  const pinRows = Math.max(leftPins.length, rightPins.length, 1);
+  const bodyMinHeight = Math.max(120, pinRows * 24 + 16);
 
   return (
     <div className="hardware-node">
       <header className="hardware-node__header">
-        <span className="hardware-node__type">{manifest.type}</span>
+        <div className="hardware-node__header-row">
+          <span className="hardware-node__type">{manifest.type}</span>
+          <button
+            type="button"
+            className="hardware-node__remove nodrag nopan"
+            aria-label={`Remove ${manifest.name} from schematic`}
+            title="Remove board"
+            onClick={(event) => {
+              event.stopPropagation();
+              removeNode(id);
+            }}
+            onPointerDown={(event) => event.stopPropagation()}
+          >
+            Remove
+          </button>
+        </div>
         <strong className="hardware-node__name">{manifest.name}</strong>
         <span className="hardware-node__id">{manifest.component_id}</span>
       </header>
@@ -139,7 +117,7 @@ function HardwareNodeComponent({ id, data }: NodeProps<Node<HardwareNodeData>>) 
         protocols={protocols}
       />
 
-      <div className="hardware-node__body">
+      <div className="hardware-node__body" style={{ minHeight: `${bodyMinHeight}px` }}>
         <div className="hardware-node__column hardware-node__column--left">
           {leftPins.map((pin, i) => (
             <PinRow

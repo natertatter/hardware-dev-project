@@ -671,6 +671,34 @@ body {
   gap: 0.125rem;
 }
 
+.hardware-node__header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.hardware-node__remove {
+  flex-shrink: 0;
+  padding: 0.15rem 0.4rem;
+  font-size: 0.5625rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  background: transparent;
+  border: 1px solid var(--lab-border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.hardware-node__remove:hover,
+.hardware-node__remove:focus-visible {
+  color: #fecaca;
+  border-color: #ef4444;
+  outline: none;
+}
+
 .hardware-node__type {
   font-size: 0.5625rem;
   font-weight: 700;

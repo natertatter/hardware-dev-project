@@ -225,7 +225,7 @@ function SchematicCanvas() {
           <DatasheetUpload />
           <h2 className="schematic-editor__title">Parts Library</h2>
           <p className="schematic-editor__hint">
-            Click a module to place it on the drafting table. Use the protocol switch on multi-bus parts.
+            Click a module to place it on the drafting table. Use Remove on a board (or Delete) to take it off the canvas. Protocol switches pins on multi-bus parts.
           </p>
           {catalogSource === "mock" && (
             <p className="schematic-editor__offline-note">
@@ -283,6 +283,7 @@ function SchematicCanvas() {
             connectionMode={ConnectionMode.Loose}
             defaultEdgeOptions={defaultEdgeOptions}
             connectionLineStyle={{ stroke: "var(--pop-blue)", strokeWidth: 2 }}
+            deleteKeyCode={["Backspace", "Delete"]}
             fitView
             fitViewOptions={{ padding: 0.2 }}
             minZoom={0.25}

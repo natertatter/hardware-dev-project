@@ -11,6 +11,17 @@ LOGICAL_TO_BCM: dict[str, int] = {
     "GPIO13": 13,
     "I2C_SDA": 2,
     "I2C_SCL": 3,
+    # RP2040 mock SPI pins → Pi SPI0 (same translation as GPIO4/GPIO5 → I2C1)
+    "GPIO18": 10,
+    "GPIO19": 9,
+    "GPIO20": 11,
+    "GPIO17": 8,
+    # Pi 4 header names from mcu_rpi4 manifest
+    "GPIO10_SPI_MOSI": 10,
+    "GPIO9_SPI_MISO": 9,
+    "GPIO11_SPI_SCK": 11,
+    "GPIO8_SPI_CE0": 8,
+    "GPIO7_SPI_CE1": 7,
 }
 
 I2C_DEVICE_PATH = "/dev/i2c-1"
