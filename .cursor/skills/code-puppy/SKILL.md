@@ -7,7 +7,9 @@ description: Default project skill for general coding work in this repository wh
 
 This is the **default skill** for this repository. Follow it when the user has not explicitly selected another skill.
 
-Do not treat this file as a replacement for a skill the user invoked with `/skill-name`, `@skill`, or a Custom Mode.
+At the start of work (and if the active skill changes), confirm with a short callout such as `Using the code-puppy skill.` Do not dump this file into the chat.
+
+Do not treat this file as a replacement for a skill the user invoked with `/skill-name`, `@skill`, or a Custom Mode. When another skill is active, call out that skill's name instead.
 
 ## Scope
 
