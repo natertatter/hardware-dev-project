@@ -1,0 +1,12 @@
+---
+description: Default to the code-puppy skill when the user has not selected another skill.
+alwaysApply: true
+---
+
+# Default skill: code-puppy
+
+This project's default skill is `.cursor/skills/code-puppy/SKILL.md`.
+
+- If the user has explicitly selected, invoked, or @-mentioned another skill (for example via `/skill-name` or a Custom Mode), follow that skill. Do not replace or override it with code-puppy.
+- If no other skill is selected, read `.cursor/skills/code-puppy/SKILL.md` and follow it for this turn.
+- Do not copy the skill body into this rule; load it from that path when it is the active default.
