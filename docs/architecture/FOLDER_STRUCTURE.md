@@ -32,7 +32,7 @@ hardware-dev-project/
 │
 ├── hardware_library/
 │   ├── datasheets/                     # PDF inputs (Librarian)
-│   └── manifests/                      # ComponentManifest JSON (*.json, *.example.json)
+│   └── manifests/                      # Production {id}.json and template {id}.example.json
 │
 ├── projects/
 │   └── <project_id>/
@@ -76,7 +76,7 @@ Library functions for pipeline stages (refine, validate, merge, approve metadata
 
 ### `hardware_library/`
 
-Long-lived component knowledge. Manifests are shared across projects. Upload API writes here and refreshes the catalog cache.
+Long-lived component knowledge. Manifests are shared across projects. Production catalog files are `{component_id}.json`. `{component_id}.example.json` templates are not loaded until `POST /api/v1/manifests/{component_id}/promote` copies one. Upload API writes production JSON here and refreshes the catalog cache.
 
 ### `projects/`
 

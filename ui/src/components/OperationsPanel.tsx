@@ -1,3 +1,4 @@
+import { formatStepTiming } from "@/lib/timingProvenance";
 import type { OperationsIssueView, OperationsStatus } from "@/store/useOperationsStore";
 import { fidelityLabel } from "@/store/useOperationsStore";
 import type { FidelityLevel, OperationStep } from "@/types/schemas";
@@ -140,13 +141,10 @@ export function OperationsPanel({
                 {step.target_node_id && (
                   <span className="operations-panel__meta"> → {step.target_node_id}</span>
                 )}
-                {step.timing?.delay_ms != null && (
-                  <span className="operations-panel__meta"> ({step.timing.delay_ms} ms)</span>
-                )}
-                {step.timing?.period_ms != null && (
-                  <span className="operations-panel__meta">
+                {step.timing && formatStepTiming(step.timing) && (
+                  <span className="operations-panel__meta" title={step.timing.note ?? undefined}>
                     {" "}
-                    every {step.timing.period_ms} ms
+                    ({formatStepTiming(step.timing)})
                   </span>
                 )}
               </li>

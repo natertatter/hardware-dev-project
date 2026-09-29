@@ -46,6 +46,23 @@ class ManifestListResponse(BaseModel):
     manifests: list[ComponentManifest]
 
 
+class ExampleManifestSummary(BaseModel):
+    component_id: str
+    name: str
+    type: str
+    promoted: bool
+
+
+class ExampleManifestListResponse(BaseModel):
+    examples: list[ExampleManifestSummary]
+
+
+class PromoteManifestResponse(BaseModel):
+    manifest: ComponentManifest
+    saved_path: str
+    message: str
+
+
 class AutoWireRequest(BaseModel):
     """Template architect: wire MCU to peripherals already placed on the schematic."""
 

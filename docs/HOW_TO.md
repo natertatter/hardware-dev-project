@@ -105,7 +105,7 @@ Then run `start-eda-platform.bat stop` and start again. The launcher now reinsta
 | Step | Action | What happens |
 |------|--------|----------------|
 | 1 | Enter narrative / **Save Draft** | Captures light-fidelity intent |
-| 2 | **Refine** | Binds steps to nodes, adds timing, may promote fidelity (LLM optional) |
+| 2 | **Refine** | Binds steps to nodes, adds timing from the part manifest when present (datasheet provenance) or from best practice, may promote fidelity (LLM optional) |
 | 3 | **Validate** | Operations Checker rules |
 | 4 | **Merge to master** | Promotes refined sequence (API; uses in-memory schematic) |
 | 5 | **Approve operations** | Required before **Generate Firmware** when an operations sequence is active |
@@ -162,13 +162,13 @@ curl -s http://localhost:8000/api/v1/projects/demo_robot/operations/master
 
 | Path | Contents |
 |------|----------|
-| `hardware_library/manifests/` | Component definitions |
+| `hardware_library/manifests/` | Production `{component_id}.json` and template `{component_id}.example.json` |
 | `hardware_library/datasheets/` | Uploaded PDFs |
 | `projects/` | Per-project schematic, metadata, operations |
 | `generated/firmware/` | Generated C (gitignored) |
 | `ui/` | Next.js editor |
 
-Add manifests by dropping JSON into `manifests/`, uploading JSON in the UI, or uploading a PDF and saving the reviewed draft (`POST /api/v1/librarian/upload`, then `POST /api/v1/librarian/manifests`).
+Add a production manifest by dropping `{component_id}.json` into `manifests/`, uploading JSON in the UI, or uploading a PDF and saving the reviewed draft (`POST /api/v1/librarian/upload`, then `POST /api/v1/librarian/manifests`). Files named `{component_id}.example.json` are templates: they stay out of the catalog until you promote one (`POST /api/v1/manifests/{component_id}/promote`, or **Promote** under Example parts). Promotion copies the template and does not overwrite an existing production file. `mcu_rp2040` and `sens_ina219` are already promoted for `demo_robot`.
 
 ---
 

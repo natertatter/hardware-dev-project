@@ -4,7 +4,7 @@ Base URL (local): `http://localhost:8000`
 
 - **OpenAPI:** `/docs` and `/redoc` when the API is running
 - **Version prefix:** `/api/v1` for all routes below except `/health`
-- **Manifests:** Unless noted, endpoints accept optional `manifests` in the JSON body; when omitted, the server loads `hardware_library/manifests/*.json` (cached until librarian upload clears cache)
+- **Manifests:** Unless noted, endpoints accept optional `manifests` in the JSON body; when omitted, the server loads production files `hardware_library/manifests/{component_id}.json` (not `*.example.json`; cached until a catalog write clears the cache)
 
 ---
 
@@ -20,8 +20,10 @@ Base URL (local): `http://localhost:8000`
 
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | `/api/v1/manifests` | List all `ComponentManifest` entries in the hardware library. |
-| GET | `/api/v1/manifests/{component_id}` | Single manifest by `component_id`. **404** if missing. |
+| GET | `/api/v1/manifests` | List production `ComponentManifest` entries (`{component_id}.json` only). |
+| GET | `/api/v1/manifests/examples` | List `*.example.json` templates: `component_id`, `name`, `type`, `promoted`. |
+| POST | `/api/v1/manifests/{component_id}/promote` | Copy `{component_id}.example.json` to `{component_id}.json`. **404** if the example is missing, **409** if the production file already exists, **400** if the example is invalid or its `component_id` does not match the filename. |
+| GET | `/api/v1/manifests/{component_id}` | Single production manifest by `component_id`. **404** if missing. |
 
 ---
 
@@ -106,7 +108,7 @@ Project artifacts live under `projects/<project_id>/` (`schematic.json`, `metada
 | PUT | `/api/v1/projects/{project_id}/operations/master` | Save master; `body.project_id` must match path. |
 | POST | `/api/v1/projects/{project_id}/operations/drafts` | Append draft under `operations/drafts/`. Body: `SaveOperationsDraftRequest` (`operations`). |
 | POST | `/api/v1/projects/{project_id}/operations/approve` | Set `operations_approved` in metadata after validation. Requires `schematic.json` on disk and passing operations validation. |
-| POST | `/api/v1/operations/refine` | `RefineOperationsRequest`: `operations`, `project_state`, optional `manifests`, `persist` (default true). Returns refined sequence, fidelity promotion stats, warnings. |
+| POST | `/api/v1/operations/refine` | `RefineOperationsRequest`: `operations`, `project_state`, optional `manifests`, `persist` (default true). Returns refined sequence, fidelity promotion stats, warnings. When a step has no timing yet, `power_on_delay_ms` and `conversion_time_ms` are copied onto `timing` with `source` `datasheet` and the same value on `step.provenance`. A slower scheduling poll period replaces a shorter conversion time and sets both to `inferred`. Timing already present on the step is not replaced. |
 | POST | `/api/v1/operations/validate` | `ValidateOperationsRequest`: `operations`, `project_state`, optional `manifests`. |
 | POST | `/api/v1/operations/merge` | `MergeOperationsRequest`: refined `operations`, optional `project_state` (loaded from disk if omitted), `bump_version`. Validates before promoting to master. **422** if validation fails. |
 | POST | `/api/v1/operations/generate-docs` | `GenerateOperatingDocsRequest`: `operations`, `project_state`. Returns markdown strings for operating procedure and bring-up checklist (does not write files; firmware generate also emits docs when operations are passed). |

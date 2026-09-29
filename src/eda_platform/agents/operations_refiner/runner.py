@@ -142,9 +142,11 @@ def refine_operations(
                 hal_call = suggest_hal_call(
                     updated.description, manifest.type, classification.hal_module
                 )
-                if hal_call:
+                if hal_call and updated.provenance == ProvenanceSource.HUMAN:
                     updated.hal_call = hal_call
                     updated.provenance = ProvenanceSource.INFERRED
+                elif hal_call:
+                    updated.hal_call = hal_call
         else:
             updated.needs_refinement = True
             qid = f"q_bind_{updated.step_id}"
@@ -174,6 +176,10 @@ def refine_operations(
                 timing = _timing_for_step(updated, component_type, manifest, poll_period)
                 if timing:
                     updated.timing = timing
+                    if timing.source == ProvenanceSource.DATASHEET:
+                        updated.provenance = ProvenanceSource.DATASHEET
+                    elif timing.source == ProvenanceSource.INFERRED:
+                        updated.provenance = ProvenanceSource.INFERRED
 
         if target_fidelity == FidelityLevel.EXECUTABLE:
             if updated.target_node_id and updated.hal_call and updated.tier:

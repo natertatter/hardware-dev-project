@@ -64,7 +64,7 @@ Vibe/draft input
 **Responsibilities:**
 - Match step descriptions to `ProjectState.nodes` via component_id / manifest name keywords
 - Assign `hal_module` and `ExecutionTier` via firmware `classifier`
-- Inject timing from `best_practices.py` (I2C poll period, power-on delay, motor ramp)
+- Inject timing from manifest `operational_constraints` when the step has none (`power_on_delay_ms`, `conversion_time_ms`), recording `datasheet` on `TimingConstraint.source` and `OperationStep.provenance`. Fall back to `best_practices.py` (I2C poll period, power-on delay, motor ramp). A slower scheduling poll raises a shorter conversion time and marks that step `inferred`.
 - Promote fidelity one level (narrative → steps → timed; timed → executable when fully bound)
 - Emit `OpenQuestion` for ambiguous bindings or missing electrical prerequisites
 

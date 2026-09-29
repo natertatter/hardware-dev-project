@@ -81,9 +81,31 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   return res.json() as Promise<T>;
 }
 
+export interface ExampleManifestSummary {
+  component_id: string;
+  name: string;
+  type: string;
+  promoted: boolean;
+}
+
 export async function fetchManifests(): Promise<ComponentManifest[]> {
   const data = await apiFetch<{ manifests: ComponentManifest[] }>("/api/v1/manifests");
   return data.manifests;
+}
+
+export async function fetchExampleManifests(): Promise<ExampleManifestSummary[]> {
+  const data = await apiFetch<{ examples: ExampleManifestSummary[] }>(
+    "/api/v1/manifests/examples",
+  );
+  return data.examples;
+}
+
+export async function promoteExampleManifest(
+  componentId: string,
+): Promise<{ manifest: ComponentManifest; saved_path: string; message: string }> {
+  return apiFetch(`/api/v1/manifests/${encodeURIComponent(componentId)}/promote`, {
+    method: "POST",
+  });
 }
 
 export async function validateProjectState(

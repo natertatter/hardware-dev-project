@@ -17,7 +17,9 @@ import {
   fetchOperationsMaster,
   fetchProjectMetadata,
   fetchProjectSchematic,
+  fetchExampleManifests,
   fetchManifests,
+  promoteExampleManifest,
   generateFirmware,
   generateOperatingDocs,
   listProjects,
@@ -25,6 +27,7 @@ import {
   saveProjectSchematic,
   validateProjectState,
 } from "@/lib/api";
+import type { ExampleManifestSummary } from "@/lib/api";
 import type { CatalogEntry, HardwareNodeData, ProjectState } from "@/types/schemas";
 import { requiresOperationsApproval, useOperationsStore } from "@/store/useOperationsStore";
 import { buildSchematicDraft } from "@/utils/buildSchematicDraft";
@@ -52,6 +55,8 @@ interface SchematicState {
   catalogLoaded: boolean;
   catalogError: string | null;
   catalogSource: CatalogSource | null;
+  exampleParts: ExampleManifestSummary[];
+  exampleMessage: string | null;
   validationStatus: ValidationStatus;
   validationIssues: ValidationIssueView[];
   validationMessage: string | null;
@@ -77,6 +82,7 @@ interface SchematicState {
     removeNode: (nodeId: string) => void;
     setNodeProtocol: (nodeId: string, protocol: string) => void;
     loadCatalog: () => Promise<void>;
+    promoteExample: (componentId: string) => Promise<void>;
     validateArchitecture: () => Promise<void>;
     autoWire: () => Promise<void>;
     approveSchematic: () => Promise<void>;
@@ -170,6 +176,8 @@ export const useSchematicStore = create<SchematicState>((set, get) => ({
   catalogLoaded: false,
   catalogError: null,
   catalogSource: null,
+  exampleParts: [],
+  exampleMessage: null,
   validationStatus: "idle",
   validationIssues: [],
   validationMessage: null,
@@ -287,19 +295,43 @@ export const useSchematicStore = create<SchematicState>((set, get) => ({
       set({ catalogLoaded: false, catalogError: null, catalogSource: null });
       try {
         const manifests = await fetchManifests();
+        let exampleParts: ExampleManifestSummary[] = [];
+        try {
+          exampleParts = await fetchExampleManifests();
+        } catch (err) {
+          console.warn("Example manifest list unavailable.", err);
+        }
         const catalog: CatalogEntry[] = manifests.map((manifest) => ({
           label: manifest.name,
           manifest,
         }));
-        set({ catalog, catalogLoaded: true, catalogError: null, catalogSource: "api" });
+        set({
+          catalog,
+          exampleParts,
+          catalogLoaded: true,
+          catalogError: null,
+          catalogSource: "api",
+        });
       } catch (err) {
         console.warn("API catalog unavailable; using built-in parts library.", err);
         set({
           catalog: mockCatalogEntries(),
+          exampleParts: [],
           catalogLoaded: true,
           catalogError: null,
           catalogSource: "mock",
         });
+      }
+    },
+    promoteExample: async (componentId: string) => {
+      set({ exampleMessage: null });
+      try {
+        await promoteExampleManifest(componentId);
+        await get().actions.loadCatalog();
+        set({ exampleMessage: `Promoted ${componentId} into the catalog.` });
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "Could not promote example";
+        set({ exampleMessage: message });
       }
     },
     validateArchitecture: async () => {
