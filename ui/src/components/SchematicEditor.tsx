@@ -13,6 +13,7 @@ import {
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { DEFAULT_PROJECT_ID } from "@/constants/project";
+import { unpromotedExamples } from "@/lib/catalogPromotion";
 
 import { HardwareNode } from "@/components/HardwareNode";
 import { DatasheetUpload } from "@/components/DatasheetUpload";
@@ -42,6 +43,8 @@ function SchematicCanvas() {
   const validationMessage = useSchematicStore((s) => s.validationMessage);
   const schematicApproved = useSchematicStore((s) => s.schematicApproved);
   const catalogError = useSchematicStore((s) => s.catalogError);
+  const exampleParts = useSchematicStore((s) => s.exampleParts);
+  const exampleMessage = useSchematicStore((s) => s.exampleMessage);
   const autoWireStatus = useSchematicStore((s) => s.autoWireStatus);
   const autoWireMessage = useSchematicStore((s) => s.autoWireMessage);
   const firmwareStatus = useSchematicStore((s) => s.firmwareStatus);
@@ -261,6 +264,30 @@ function SchematicCanvas() {
               ))}
             </ul>
           )}
+          {catalogSource === "api" && unpromotedExamples(exampleParts).length > 0 && (
+            <>
+              <h2 className="schematic-editor__title">Example parts</h2>
+              <p className="schematic-editor__hint">
+                Templates stay out of the catalog until you promote them.
+              </p>
+              <ul className="schematic-editor__catalog">
+                {unpromotedExamples(exampleParts).map((example) => (
+                  <li key={example.component_id} className="schematic-editor__example">
+                    <span className="schematic-editor__catalog-type">{example.type}</span>
+                    <span className="schematic-editor__catalog-name">{example.name}</span>
+                    <button
+                      type="button"
+                      className="editor-shell__btn"
+                      onClick={() => void actions.promoteExample(example.component_id)}
+                    >
+                      Promote
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+          {exampleMessage && <p className="panel-card__message">{exampleMessage}</p>}
         </aside>
 
         <main className="schematic-editor__canvas" ref={canvasRef}>

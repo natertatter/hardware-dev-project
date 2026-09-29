@@ -349,6 +349,18 @@ body {
   line-height: 1.35;
 }
 
+.schematic-editor__example {
+  padding: 0.625rem 0.75rem;
+  border: 1px dashed var(--lab-border);
+  border-radius: var(--radius-sm);
+  background: var(--lab-bg);
+}
+
+.schematic-editor__example .editor-shell__btn {
+  margin-top: 0.5rem;
+  width: 100%;
+}
+
 .schematic-editor__canvas {
   flex: 1;
   min-width: 0;

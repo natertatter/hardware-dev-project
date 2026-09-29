@@ -4,7 +4,7 @@ Base URL (local): `http://localhost:8000`
 
 - **OpenAPI:** `/docs` and `/redoc` when the API is running
 - **Version prefix:** `/api/v1` for all routes below except `/health`
-- **Manifests:** Unless noted, endpoints accept optional `manifests` in the JSON body; when omitted, the server loads `hardware_library/manifests/*.json` (cached until librarian upload clears cache)
+- **Manifests:** Unless noted, endpoints accept optional `manifests` in the JSON body; when omitted, the server loads production files `hardware_library/manifests/{component_id}.json` (not `*.example.json`; cached until a catalog write clears the cache)
 
 ---
 
@@ -20,8 +20,10 @@ Base URL (local): `http://localhost:8000`
 
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | `/api/v1/manifests` | List all `ComponentManifest` entries in the hardware library. |
-| GET | `/api/v1/manifests/{component_id}` | Single manifest by `component_id`. **404** if missing. |
+| GET | `/api/v1/manifests` | List production `ComponentManifest` entries (`{component_id}.json` only). |
+| GET | `/api/v1/manifests/examples` | List `*.example.json` templates: `component_id`, `name`, `type`, `promoted`. |
+| POST | `/api/v1/manifests/{component_id}/promote` | Copy `{component_id}.example.json` to `{component_id}.json`. **404** if the example is missing, **409** if the production file already exists, **400** if the example is invalid or its `component_id` does not match the filename. |
+| GET | `/api/v1/manifests/{component_id}` | Single production manifest by `component_id`. **404** if missing. |
 
 ---
 

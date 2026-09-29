@@ -2,7 +2,7 @@
 
 Living plan for the EDA platform. **Implementation status** for the operations sequence system is recorded in [`docs/architecture/OPERATIONS_SEQUENCE.md`](architecture/OPERATIONS_SEQUENCE.md). **HTTP contracts** are in [`docs/architecture/API.md`](architecture/API.md).
 
-Last reviewed: 2026-09-29 (Horizon C2 — manifest timing provenance in refine. C1 vendor-PDF layout extraction and C3 catalog promotion remain open).
+Last reviewed: 2026-09-29 (Horizon C2–C3 — datasheet timing provenance in refine, and example-to-production catalog promotion. C1 vendor-PDF layout extraction remains open).
 
 ---
 
@@ -13,7 +13,7 @@ Last reviewed: 2026-09-29 (Horizon C2 — manifest timing provenance in refine. 
 | Schemas | Mature | `ComponentManifest`, `ProjectState`, `OperationsSequence`, protocols, `OperationalConstraints` |
 | Logic Checker | Mature | Rule-based validation with broad test coverage |
 | Systems Architect | v1 | Deterministic template auto-wire (I2C, SPI, multi-MCU UART/USB serial) |
-| Hardware Librarian | v1.1 | JSON upload commits immediately. PDF text → reviewable draft (deterministic extract; Anthropic when `ANTHROPIC_API_KEY` is set). Catalog write only after human save. Arbitrary vendor-PDF layout extraction not yet. |
+| Hardware Librarian | v1.1 | JSON upload commits immediately. PDF text → reviewable draft (deterministic extract; Anthropic when `ANTHROPIC_API_KEY` is set). Catalog write only after human save. `*.example.json` templates promote to `{component_id}.json`. Arbitrary vendor-PDF layout extraction not yet. |
 | Operations | v1 | Refiner, checker, API, UI panel, optional LLM, operating docs |
 | Firmware Engineer | v1 (Pi 4) | pthreads + I2C sensors; boot delays + runtime ops interpreter for timed/executable sequences |
 | UI | v1 | React Flow editor, catalog, protocols, datasheet upload, operations sidebar |
@@ -60,7 +60,7 @@ Senior review history: [`docs/reviews/HORIZON_B_SENIOR_REVIEW.md`](reviews/HORIZ
 |----|------|-----------|
 | C1 | LLM extraction pipeline | **Partial** — shipped: PDF text → `ComponentManifest` draft, validation issues (schema, protocol, defaulted fields), and a human edit/commit loop (`POST /api/v1/librarian/manifests`; UI review form). Deterministic parser covers labeled excerpts and common electrical phrases; optional Anthropic extractor when `ANTHROPIC_API_KEY` is set, with deterministic fallback. Not done: layout-aware or scanned vendor PDFs (pin tables as drawings). |
 | C2 | Provenance in refine | **Done** — refine copies `power_on_delay_ms` and `conversion_time_ms` into `TimingConstraint.source` / `note` and `OperationStep.provenance` (`datasheet`). A slower scheduling poll keeps the plan period and marks provenance `inferred`. Existing step timing is left unchanged. `i2c_max_clock_hz` is not a step timing field. Contract: [`docs/reviews/HORIZON_C2_C3_PLAN.md`](reviews/HORIZON_C2_C3_PLAN.md). |
-| C3 | Catalog hygiene | Clear promotion path from `.example.json` to production manifests |
+| C3 | Catalog hygiene | **Done** — `*.example.json` is not in the live catalog. `GET /api/v1/manifests/examples` lists templates; `POST /api/v1/manifests/{component_id}/promote` copies one to `{component_id}.json` (**409** if that file exists). `mcu_rp2040` and `sens_ina219` are promoted in-repo for `demo_robot`. The parts library can promote the rest. No overwrite. Contract: [`docs/reviews/HORIZON_C2_C3_PLAN.md`](reviews/HORIZON_C2_C3_PLAN.md). |
 | C4 | Schema enhancements | e.g. `nominal_voltage` on `Pin` for cleaner power rules |
 
 ---
@@ -104,7 +104,7 @@ Authentication, multi-project tenancy, hosted deploy (TLS), pipeline observabili
 3. ~~**B1–B4** (executable ops + docs UX + pipeline)~~ — complete
 4. **C1** (Librarian v2) — partial: text extract + validate + human commit shipped; arbitrary vendor-PDF / scanned-page extraction remains
 5. **C2** (provenance in refine) — complete for `power_on_delay_ms` and `conversion_time_ms`
-6. **C3** (catalog hygiene) — next
+6. **C3** (catalog hygiene) — complete: promote `*.example.json` to production `{id}.json`; no overwrite
 7. **E1** (motors on Pi)
 8. **D2 / D3**, then **E3**
 

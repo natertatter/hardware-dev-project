@@ -82,6 +82,107 @@ describe("useSchematicStore", () => {
     globalThis.fetch = originalFetch;
   });
 
+  it("loads unpromoted example parts from the API catalog", async () => {
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = vi.fn(async (url: string) => {
+      const path = String(url);
+      if (path.endsWith("/api/v1/manifests/examples")) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            examples: [
+              { component_id: "mcu_rp2040", name: "Pico", type: "MCU", promoted: true },
+              { component_id: "sens_bme280", name: "BME280", type: "SENSOR", promoted: false },
+            ],
+          }),
+          text: async () => "",
+        };
+      }
+      if (path.endsWith("/api/v1/manifests")) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({ manifests: [COMPONENT_CATALOG[0]] }),
+          text: async () => "",
+        };
+      }
+      throw new Error(`unexpected ${path}`);
+    }) as typeof fetch;
+
+    useSchematicStore.setState({
+      catalog: [],
+      exampleParts: [],
+      catalogLoaded: false,
+      catalogSource: null,
+    });
+    await useSchematicStore.getState().actions.loadCatalog();
+
+    const state = useSchematicStore.getState();
+    expect(state.catalogSource).toBe("api");
+    expect(state.catalog.map((entry) => entry.manifest.component_id)).toEqual(["mcu_rp2040"]);
+    expect(state.exampleParts.map((item) => item.component_id)).toEqual([
+      "mcu_rp2040",
+      "sens_bme280",
+    ]);
+
+    globalThis.fetch = originalFetch;
+  });
+
+  it("promotes an example and reloads the catalog", async () => {
+    const originalFetch = globalThis.fetch;
+    const calls: string[] = [];
+    globalThis.fetch = vi.fn(async (url: string, init?: RequestInit) => {
+      const path = String(url);
+      calls.push(`${init?.method ?? "GET"} ${path}`);
+      if (path.endsWith("/sens_bme280/promote")) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            manifest: COMPONENT_CATALOG[1],
+            saved_path: "sens_bme280.json",
+            message: "Promoted",
+          }),
+          text: async () => "",
+        };
+      }
+      if (path.endsWith("/api/v1/manifests/examples")) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            examples: [
+              { component_id: "sens_bme280", name: "BME280", type: "SENSOR", promoted: true },
+            ],
+          }),
+          text: async () => "",
+        };
+      }
+      if (path.endsWith("/api/v1/manifests")) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({ manifests: COMPONENT_CATALOG }),
+          text: async () => "",
+        };
+      }
+      throw new Error(`unexpected ${path}`);
+    }) as typeof fetch;
+
+    await useSchematicStore.getState().actions.promoteExample("sens_bme280");
+
+    const state = useSchematicStore.getState();
+    expect(calls.some((call) => call.startsWith("POST ") && call.includes("/sens_bme280/promote"))).toBe(
+      true,
+    );
+    expect(state.exampleMessage).toBe("Promoted sens_bme280 into the catalog.");
+    expect(state.catalogSource).toBe("api");
+    expect(state.exampleParts[0]?.promoted).toBe(true);
+
+    globalThis.fetch = originalFetch;
+  });
+
   it("removes a board and its connected wires", () => {
     const mcu = COMPONENT_CATALOG[0];
     const sensor = COMPONENT_CATALOG[1];

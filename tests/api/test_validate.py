@@ -34,6 +34,7 @@ class TestManifestsAPI:
         ids = {m["component_id"] for m in data["manifests"]}
         assert "mcu_rp2040" in ids
         assert "sens_ina219" in ids
+        assert "sens_bme280" not in ids
 
     def test_get_manifest_by_id(self):
         res = client.get("/api/v1/manifests/mcu_rp2040")
