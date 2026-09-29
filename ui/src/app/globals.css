@@ -931,6 +931,82 @@ body {
   color: var(--text-muted);
 }
 
+.datasheet-review {
+  margin-top: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.datasheet-review__note,
+.datasheet-review__pins-title {
+  margin: 0;
+  font-size: 0.6875rem;
+  color: var(--text-muted);
+}
+
+.datasheet-review__pins-title {
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.datasheet-review__issues {
+  margin: 0;
+  padding-left: 1rem;
+  font-size: 0.6875rem;
+}
+
+.datasheet-review__issue--error {
+  color: var(--pop-orange);
+}
+
+.datasheet-review__issue--warning {
+  color: var(--text-muted);
+}
+
+.datasheet-review__label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  font-size: 0.625rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.datasheet-review__input {
+  font: inherit;
+  font-size: 0.75rem;
+  letter-spacing: 0;
+  text-transform: none;
+  padding: 0.3rem 0.4rem;
+  border: 1px solid var(--lab-border);
+  border-radius: var(--radius-sm);
+  background: var(--lab-bg);
+  color: var(--text-primary);
+  width: 100%;
+}
+
+.datasheet-review__grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.4rem;
+}
+
+.datasheet-review__pin {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  gap: 0.25rem;
+  align-items: center;
+}
+
+.datasheet-review__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
 .panel-card__message--success {
   color: var(--pop-green);
   font-size: 0.6875rem;

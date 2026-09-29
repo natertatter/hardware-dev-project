@@ -1,15 +1,11 @@
 """Tests for datasheet/manifest upload ingestion."""
 
 import json
-from pathlib import Path
 
 import pytest
 
 from eda_platform.agents.librarian.ingest import ingest_json_manifest, ingest_upload
 from eda_platform.api.manifest_loader import clear_manifest_cache, manifests_directory
-from eda_platform.schemas import ComponentManifest
-
-REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
 @pytest.fixture(autouse=True)
@@ -46,7 +42,7 @@ def test_ingest_json_manifest_validates():
 def test_ingest_upload_json_saves_manifest(tmp_path, monkeypatch):
     monkeypatch.setattr(
         "eda_platform.agents.librarian.ingest._MANIFESTS_DIR",
-        manifests_directory(),
+        tmp_path,
     )
     raw = {
         "component_id": "test_upload_json",
@@ -65,15 +61,23 @@ def test_ingest_upload_json_saves_manifest(tmp_path, monkeypatch):
             {"pin_id": "SCL", "pin_type": "I2C_SCL", "supported_features": ["I2C"]},
         ],
     }
-    manifest, path, message = ingest_upload("sensor.json", json.dumps(raw).encode())
-    assert manifest.component_id == "test_upload_json"
-    assert path.exists()
-    assert "added" in message.lower() or "test_upload_json" in message
-    path.unlink(missing_ok=True)
+    result = ingest_upload("sensor.json", json.dumps(raw).encode())
+    assert result.committed is True
+    assert result.extraction_source == "json"
+    assert result.manifest.component_id == "test_upload_json"
+    assert result.saved_path.exists()
+    assert "added" in result.message.lower() or "test_upload_json" in result.message
+    result.saved_path.unlink(missing_ok=True)
 
 
-def test_ingest_upload_pdf_creates_template_manifest():
-    manifest, path, message = ingest_upload("bme280_datasheet.pdf", b"%PDF-1.4 fake")
-    assert manifest.type.value == "SENSOR"
-    assert "I2C" in message or "I2C" in str(manifest.protocol_profiles)
-    path.unlink(missing_ok=True)
+def test_ingest_upload_pdf_without_text_stays_a_draft(tmp_path, monkeypatch):
+    monkeypatch.setattr("eda_platform.agents.librarian.ingest._MANIFESTS_DIR", tmp_path)
+    result = ingest_upload("bme280_datasheet.pdf", b"%PDF-1.4 fake")
+    assert result.committed is False
+    assert result.extraction_source == "template"
+    assert result.manifest.type.value == "SENSOR"
+    assert "I2C" in (result.manifest.protocol_profiles or {})
+    assert result.saved_path.suffix == ".pdf"
+    assert result.saved_path.exists()
+    assert list(tmp_path.glob("*.json")) == []
+    assert any(issue.code == "template_fallback" for issue in result.issues)

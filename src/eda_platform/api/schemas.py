@@ -165,7 +165,27 @@ class GenerateOperatingDocsResponse(BaseModel):
     bringup_checklist: str
 
 
+class ExtractionIssueResponse(BaseModel):
+    severity: str
+    code: str
+    message: str
+    field: str | None = None
+
+
 class UploadManifestResponse(BaseModel):
+    manifest: ComponentManifest
+    saved_path: str
+    message: str
+    committed: bool = True
+    extraction_source: str = "json"
+    issues: list[ExtractionIssueResponse] = Field(default_factory=list)
+
+
+class CommitManifestRequest(BaseModel):
+    manifest: ComponentManifest
+
+
+class CommitManifestResponse(BaseModel):
     manifest: ComponentManifest
     saved_path: str
     message: str
