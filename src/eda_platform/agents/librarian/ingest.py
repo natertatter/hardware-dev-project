@@ -1,10 +1,17 @@
 """Datasheet ingestion: PDF/JSON upload to ComponentManifest."""
 
-import json
+from __future__ import annotations
+
 import re
+from dataclasses import dataclass
 from pathlib import Path
 
-from eda_platform.schemas import ComponentManifest, ComponentType, Pin, PinType, PowerRequirements
+from eda_platform.agents.librarian.extract import (
+    DatasheetExtraction,
+    ExtractionIssue,
+    extract_datasheet,
+)
+from eda_platform.schemas import ComponentManifest
 from eda_platform.schemas.protocols import available_protocols, default_protocol
 
 _REPO_ROOT = Path(__file__).resolve().parents[4]
@@ -12,9 +19,14 @@ _DATASHEETS_DIR = _REPO_ROOT / "hardware_library" / "datasheets"
 _MANIFESTS_DIR = _REPO_ROOT / "hardware_library" / "manifests"
 
 
-def _slugify(name: str) -> str:
-    slug = re.sub(r"[^a-z0-9]+", "_", name.lower()).strip("_")
-    return slug[:48] or "component"
+@dataclass
+class IngestResult:
+    manifest: ComponentManifest
+    saved_path: Path
+    message: str
+    committed: bool
+    extraction_source: str
+    issues: list[ExtractionIssue]
 
 
 def _unique_component_id(base: str) -> str:
@@ -24,37 +36,6 @@ def _unique_component_id(base: str) -> str:
         counter += 1
         candidate = f"{base}_{counter}"
     return candidate
-
-
-def _template_sensor_manifest(component_id: str, name: str) -> ComponentManifest:
-    """Generate a multi-protocol sensor template from a datasheet filename."""
-    return ComponentManifest(
-        component_id=component_id,
-        name=name,
-        type=ComponentType.SENSOR,
-        power_requirements=PowerRequirements(
-            min_operating_voltage=3.0,
-            max_operating_voltage=3.6,
-            logic_level_voltage=3.3,
-            max_current_draw_ma=5.0,
-        ),
-        default_i2c_address="0x76",
-        default_protocol="I2C",
-        protocol_profiles={
-            "I2C": ["VCC", "GND", "SDA", "SCL"],
-            "SPI": ["VCC", "GND", "SDI", "SDO", "SCK", "CS"],
-        },
-        pins=[
-            Pin(pin_id="VCC", pin_type=PinType.POWER),
-            Pin(pin_id="GND", pin_type=PinType.GND),
-            Pin(pin_id="SDA", pin_type=PinType.I2C_SDA, supported_features=["I2C"]),
-            Pin(pin_id="SCL", pin_type=PinType.I2C_SCL, supported_features=["I2C"]),
-            Pin(pin_id="SDI", pin_type=PinType.SPI_MOSI, supported_features=["SPI"]),
-            Pin(pin_id="SDO", pin_type=PinType.SPI_MISO, supported_features=["SPI"]),
-            Pin(pin_id="SCK", pin_type=PinType.SPI_SCK, supported_features=["SPI"]),
-            Pin(pin_id="CS", pin_type=PinType.SPI_CS, supported_features=["SPI"]),
-        ],
-    )
 
 
 def ingest_json_manifest(content: bytes) -> ComponentManifest:
@@ -68,24 +49,32 @@ def ingest_json_manifest(content: bytes) -> ComponentManifest:
     return manifest
 
 
-def ingest_pdf_datasheet(filename: str, content: bytes) -> tuple[ComponentManifest, Path]:
-    """Save a PDF datasheet and produce a template manifest.
-
-    Full LLM-based extraction is deferred; this stub saves the PDF and creates
-    a multi-protocol sensor template keyed off the filename.
-    """
+def save_pdf_datasheet(filename: str, content: bytes) -> Path:
+    """Store the uploaded PDF. Does not write a catalog manifest."""
     _DATASHEETS_DIR.mkdir(parents=True, exist_ok=True)
     safe_name = re.sub(r"[^a-zA-Z0-9._-]", "_", Path(filename).name)
     datasheet_path = _DATASHEETS_DIR / safe_name
     datasheet_path.write_bytes(content)
+    return datasheet_path
 
-    stem = Path(filename).stem
-    display_name = stem.replace("_", " ").replace("-", " ").strip().title()
-    base_id = _slugify(f"sens_{stem}")
-    component_id = _unique_component_id(base_id)
 
-    manifest = _template_sensor_manifest(component_id, display_name or component_id)
-    return manifest, datasheet_path
+def _with_unique_id(extraction: DatasheetExtraction) -> DatasheetExtraction:
+    original = extraction.manifest.component_id
+    unique = _unique_component_id(original)
+    if unique == original:
+        return extraction
+    extraction.manifest = extraction.manifest.model_copy(update={"component_id": unique})
+    extraction.issues.append(
+        ExtractionIssue(
+            severity="warning",
+            code="component_id_taken",
+            message=(
+                f"Component id '{original}' is already in the catalog; the draft uses '{unique}'."
+            ),
+            field="component_id",
+        )
+    )
+    return extraction
 
 
 def save_manifest(manifest: ComponentManifest) -> Path:
@@ -96,31 +85,49 @@ def save_manifest(manifest: ComponentManifest) -> Path:
     return path
 
 
-def ingest_upload(filename: str, content: bytes) -> tuple[ComponentManifest, Path, str | None]:
+def commit_manifest(manifest: ComponentManifest) -> Path:
+    """Validate protocols and write a human-approved manifest into the catalog."""
+    if not available_protocols(manifest):
+        raise ValueError(
+            f"Manifest '{manifest.component_id}' has no recognizable communication protocols"
+        )
+    if (_MANIFESTS_DIR / f"{manifest.component_id}.json").exists():
+        raise ValueError(
+            f"Component '{manifest.component_id}' already exists in the catalog"
+        )
+    return save_manifest(manifest)
+
+
+def ingest_upload(filename: str, content: bytes) -> IngestResult:
     """Route upload by extension: JSON manifests or PDF datasheets.
 
-    Returns (manifest, saved_path, message).
+    JSON is validated and committed. PDF is stored and returned as a draft
+    the caller must commit after review.
     """
     lower = filename.lower()
     if lower.endswith(".json"):
         manifest = ingest_json_manifest(content)
-        if (_MANIFESTS_DIR / f"{manifest.component_id}.json").exists():
-            raise ValueError(
-                f"Component '{manifest.component_id}' already exists in the catalog"
-            )
-        path = save_manifest(manifest)
+        path = commit_manifest(manifest)
         proto = default_protocol(manifest)
-        return manifest, path, f"Manifest '{manifest.component_id}' added (protocol: {proto})"
+        return IngestResult(
+            manifest=manifest,
+            saved_path=path,
+            message=f"Manifest '{manifest.component_id}' added (protocol: {proto})",
+            committed=True,
+            extraction_source="json",
+            issues=[],
+        )
 
     if lower.endswith(".pdf"):
-        manifest, datasheet_path = ingest_pdf_datasheet(filename, content)
-        manifest_path = save_manifest(manifest)
-        protos = ", ".join(available_protocols(manifest))
-        return (
-            manifest,
-            manifest_path,
-            f"Datasheet saved to {datasheet_path.name}; template manifest created "
-            f"with protocols: {protos}",
+        datasheet_path = save_pdf_datasheet(filename, content)
+        extraction = _with_unique_id(extract_datasheet(filename, content))
+        return IngestResult(
+            manifest=extraction.manifest,
+            saved_path=datasheet_path,
+            message=extraction.message,
+            committed=False,
+            extraction_source=extraction.source,
+            issues=list(extraction.issues),
         )
 
     raise ValueError("Unsupported file type — upload a .json manifest or .pdf datasheet")
