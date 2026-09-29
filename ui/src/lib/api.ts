@@ -1,5 +1,6 @@
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
+import type { ExtractionIssue } from "@/lib/manifestReview";
 import type {
   ComponentManifest,
   OperationsSequence,
@@ -36,6 +37,15 @@ export interface GenerateFirmwareResponse {
 }
 
 export interface UploadManifestResponse {
+  manifest: ComponentManifest;
+  saved_path: string;
+  message: string;
+  committed?: boolean;
+  extraction_source?: string;
+  issues?: ExtractionIssue[];
+}
+
+export interface CommitManifestResponse {
   manifest: ComponentManifest;
   saved_path: string;
   message: string;
@@ -261,4 +271,11 @@ export async function uploadDatasheet(file: File): Promise<UploadManifestRespons
   }
 
   return res.json() as Promise<UploadManifestResponse>;
+}
+
+export async function commitManifest(manifest: ComponentManifest): Promise<CommitManifestResponse> {
+  return apiFetch<CommitManifestResponse>("/api/v1/librarian/manifests", {
+    method: "POST",
+    body: JSON.stringify({ manifest }),
+  });
 }
