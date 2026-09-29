@@ -11,7 +11,11 @@ def power_on_delay_ms(manifest: ComponentManifest | None) -> tuple[int, Provenan
     if manifest and manifest.operational_constraints:
         delay = manifest.operational_constraints.power_on_delay_ms
         if delay is not None:
-            return delay, ProvenanceSource.DATASHEET, f"{manifest.component_id} power_on_delay_ms"
+            return (
+                delay,
+                ProvenanceSource.DATASHEET,
+                f"{manifest.component_id} operational_constraints.power_on_delay_ms",
+            )
     return POWER_ON_SETTLE_MS, ProvenanceSource.BEST_PRACTICE, "Generic power rail settle"
 
 
@@ -19,7 +23,11 @@ def sensor_poll_period_ms(manifest: ComponentManifest | None) -> tuple[int, Prov
     if manifest and manifest.operational_constraints:
         conv = manifest.operational_constraints.conversion_time_ms
         if conv is not None:
-            return conv, ProvenanceSource.DATASHEET, f"{manifest.component_id} conversion_time_ms"
+            return (
+                conv,
+                ProvenanceSource.DATASHEET,
+                f"{manifest.component_id} operational_constraints.conversion_time_ms",
+            )
     return I2C_SENSOR_POLL_PERIOD_MS, ProvenanceSource.BEST_PRACTICE, "Default I2C sensor poll interval"
 
 
@@ -67,8 +75,27 @@ def timing_for_step(
 
     if component_type == ComponentType.SENSOR and is_peripheral:
         period, source, note = sensor_poll_period_ms(manifest)
-        # Scheduling plan may override poll period when faster bus is available
-        effective = max(period, poll_period_ms) if source == ProvenanceSource.DATASHEET else poll_period_ms
-        return TimingConstraint(period_ms=effective, source=source, note=note)
+        if source == ProvenanceSource.DATASHEET and poll_period_ms > period:
+            return TimingConstraint(
+                period_ms=poll_period_ms,
+                source=ProvenanceSource.INFERRED,
+                note=(
+                    f"{note} is {period} ms; scheduling plan period "
+                    f"{poll_period_ms} ms is slower, so the step uses the plan"
+                ),
+            )
+        if source == ProvenanceSource.DATASHEET:
+            return TimingConstraint(period_ms=max(period, poll_period_ms), source=source, note=note)
+        schedule_note = note
+        if poll_period_ms != period:
+            schedule_note = (
+                f"Scheduling plan poll period {poll_period_ms} ms "
+                f"(best-practice default {period} ms)"
+            )
+        return TimingConstraint(
+            period_ms=poll_period_ms,
+            source=ProvenanceSource.BEST_PRACTICE,
+            note=schedule_note,
+        )
 
     return None

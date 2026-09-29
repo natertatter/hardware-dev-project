@@ -2,7 +2,7 @@
 
 Living plan for the EDA platform. **Implementation status** for the operations sequence system is recorded in [`docs/architecture/OPERATIONS_SEQUENCE.md`](architecture/OPERATIONS_SEQUENCE.md). **HTTP contracts** are in [`docs/architecture/API.md`](architecture/API.md).
 
-Last reviewed: 2026-09-29 (Horizon C1 first slice — structured extract, validation issues, and human commit. Arbitrary vendor-PDF layout extraction is still open).
+Last reviewed: 2026-09-29 (Horizon C2 — manifest timing provenance in refine. C1 vendor-PDF layout extraction and C3 catalog promotion remain open).
 
 ---
 
@@ -59,7 +59,7 @@ Senior review history: [`docs/reviews/HORIZON_B_SENIOR_REVIEW.md`](reviews/HORIZ
 | ID | Work | Done when |
 |----|------|-----------|
 | C1 | LLM extraction pipeline | **Partial** — shipped: PDF text → `ComponentManifest` draft, validation issues (schema, protocol, defaulted fields), and a human edit/commit loop (`POST /api/v1/librarian/manifests`; UI review form). Deterministic parser covers labeled excerpts and common electrical phrases; optional Anthropic extractor when `ANTHROPIC_API_KEY` is set, with deterministic fallback. Not done: layout-aware or scanned vendor PDFs (pin tables as drawings). |
-| C2 | Provenance in refine | Timing fields flow from manifest into operations provenance |
+| C2 | Provenance in refine | **Done** — refine copies `power_on_delay_ms` and `conversion_time_ms` into `TimingConstraint.source` / `note` and `OperationStep.provenance` (`datasheet`). A slower scheduling poll keeps the plan period and marks provenance `inferred`. Existing step timing is left unchanged. `i2c_max_clock_hz` is not a step timing field. Contract: [`docs/reviews/HORIZON_C2_C3_PLAN.md`](reviews/HORIZON_C2_C3_PLAN.md). |
 | C3 | Catalog hygiene | Clear promotion path from `.example.json` to production manifests |
 | C4 | Schema enhancements | e.g. `nominal_voltage` on `Pin` for cleaner power rules |
 
@@ -103,8 +103,10 @@ Authentication, multi-project tenancy, hosted deploy (TLS), pipeline observabili
 2. ~~**A5** (hardware proof)~~ — host script + Pi checklist complete
 3. ~~**B1–B4** (executable ops + docs UX + pipeline)~~ — complete
 4. **C1** (Librarian v2) — partial: text extract + validate + human commit shipped; arbitrary vendor-PDF / scanned-page extraction remains
-5. **E1** (motors on Pi)
-6. **D2 / D3**, then **E3**
+5. **C2** (provenance in refine) — complete for `power_on_delay_ms` and `conversion_time_ms`
+6. **C3** (catalog hygiene) — next
+7. **E1** (motors on Pi)
+8. **D2 / D3**, then **E3**
 
 ---
 
