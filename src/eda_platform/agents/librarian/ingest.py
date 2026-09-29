@@ -30,12 +30,12 @@ class IngestResult:
 
 
 def _unique_component_id(base: str) -> str:
-    candidate = base
+    if not (_MANIFESTS_DIR / f"{base}.json").exists():
+        return base
     counter = 1
-    while (_MANIFESTS_DIR / f"{candidate}.json").exists():
+    while (_MANIFESTS_DIR / f"{base}_{counter}.json").exists():
         counter += 1
-        candidate = f"{base}_{counter}"
-    return candidate
+    return f"{base}_{counter}"
 
 
 def ingest_json_manifest(content: bytes) -> ComponentManifest:

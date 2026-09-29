@@ -209,6 +209,14 @@ def test_extractor_selection_follows_api_key(monkeypatch: pytest.MonkeyPatch):
     assert isinstance(selected, AnthropicDatasheetExtractor)
 
 
+def test_taken_component_id_is_suffixed_from_one(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr("eda_platform.agents.librarian.ingest._MANIFESTS_DIR", tmp_path)
+    (tmp_path / "sens_bme280_extract.json").write_text("{}")
+    result = ingest_upload("env.pdf", _pdf(_LABELED))
+    assert result.manifest.component_id == "sens_bme280_extract_1"
+    assert any(issue.code == "component_id_taken" for issue in result.issues)
+
+
 def test_pdf_upload_does_not_commit_until_save(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr("eda_platform.agents.librarian.ingest._MANIFESTS_DIR", tmp_path)
     result = ingest_upload("env.pdf", _pdf(_LABELED))
