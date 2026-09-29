@@ -92,7 +92,7 @@ Then run `start-eda-platform.bat stop` and start again. The launcher now reinsta
 
 | Step | Action | What happens |
 |------|--------|----------------|
-| 1 | **Parts library** or **Datasheet upload** | Add modules to the catalog; PDF upload creates a template manifest (review in `hardware_library/manifests/`) |
+| 1 | **Parts library** or **Datasheet upload** | JSON upload adds a part immediately. PDF upload extracts a draft (or a template if no text was readable); review the fields, then **Save to catalog** before it is placed. |
 | 2 | Click a catalog entry | Places a node on the canvas (optional viewport placement; mock catalog if API is offline) |
 | 3 | **Remove** on a board (or Delete) | Takes that module and its wires off the canvas. Use this to clear extra boards loaded with a project. |
 | 4 | **Protocol** on multi-bus parts | Switches active pins; invalid edges are removed |
@@ -168,7 +168,7 @@ curl -s http://localhost:8000/api/v1/projects/demo_robot/operations/master
 | `generated/firmware/` | Generated C (gitignored) |
 | `ui/` | Next.js editor |
 
-Add manifests by dropping JSON into `manifests/` or using **Datasheet upload** in the UI / `POST /api/v1/librarian/upload`.
+Add manifests by dropping JSON into `manifests/`, uploading JSON in the UI, or uploading a PDF and saving the reviewed draft (`POST /api/v1/librarian/upload`, then `POST /api/v1/librarian/manifests`).
 
 ---
 

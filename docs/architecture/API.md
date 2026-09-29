@@ -47,14 +47,16 @@ Base URL (local): `http://localhost:8000`
 
 | Method | Path | Body | Response |
 |--------|------|------|----------|
-| POST | `/api/v1/librarian/upload` | `multipart/form-data`, field `file` (JSON manifest or PDF) | `UploadManifestResponse`: `manifest`, `saved_path`, `message` |
+| POST | `/api/v1/librarian/upload` | `multipart/form-data`, field `file` (JSON manifest or PDF) | `UploadManifestResponse`: `manifest`, `saved_path`, `message`, `committed`, `extraction_source` (`json` \| `structured` \| `llm` \| `template`), `issues[]` (`severity`, `code`, `message`, optional `field`) |
+| POST | `/api/v1/librarian/manifests` | `CommitManifestRequest`: `manifest` | `CommitManifestResponse`: `manifest`, `saved_path`, `message` |
 
 **Behavior:**
 
-- **JSON:** Validated and saved under `hardware_library/manifests/`.
-- **PDF:** Stored under `hardware_library/datasheets/`; a multi-protocol **template** manifest is generated (full datasheet LLM extraction is planned — see [`ROADMAP.md`](../ROADMAP.md)).
+- **JSON:** Validated and saved under `hardware_library/manifests/`. `committed` is true.
+- **PDF:** Stored under `hardware_library/datasheets/`. Text is extracted into a draft `ComponentManifest` (labeled/prose parser, or Anthropic when `ANTHROPIC_API_KEY` is set). The draft is **not** written to the catalog (`committed` is false). Warnings cover template fallback and defaulted fields; `no_protocol` is an error. See [`ROADMAP.md`](../ROADMAP.md) for what is still out of scope (layout-aware vendor PDFs).
+- **Commit:** `POST /librarian/manifests` re-validates the edited manifest and saves it. **400** if it has no communication protocol or the `component_id` already exists.
 
-Clears the in-memory manifest cache so the next catalog read sees new parts.
+The in-memory manifest cache is cleared when a manifest is actually saved.
 
 ---
 
